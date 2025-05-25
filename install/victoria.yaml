@@ -1,0 +1,113 @@
+---
+# Source: victoria-logs-single/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: server
+    app.kubernetes.io/instance: victoria
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: victoria-logs-single
+    app.kubernetes.io/version: v1.21.0-victorialogs
+    helm.sh/chart: victoria-logs-single-0.9.8
+  name: victoria-logs
+  namespace: monitoring
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 9428
+      protocol: TCP
+      targetPort: http
+  selector:
+    app: server
+    app.kubernetes.io/instance: victoria
+    app.kubernetes.io/name: victoria-logs-single
+---
+# Source: victoria-logs-single/templates/server.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: victoria-logs
+  namespace: monitoring
+  labels:
+    app: server
+    app.kubernetes.io/instance: victoria
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: victoria-logs-single
+    app.kubernetes.io/version: v1.21.0-victorialogs
+    helm.sh/chart: victoria-logs-single-0.9.8
+spec:
+  podManagementPolicy: OrderedReady
+  updateStrategy: {}
+  replicas: 1
+  serviceName: victoria-logs
+  selector:
+    matchLabels:
+      app: server
+      app.kubernetes.io/instance: victoria
+      app.kubernetes.io/name: victoria-logs-single
+  template:
+    metadata:
+      labels:
+        app: server
+        app.kubernetes.io/instance: victoria
+        app.kubernetes.io/managed-by: Helm
+        app.kubernetes.io/name: victoria-logs-single
+    spec:
+      securityContext:
+        fsGroup: 2000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: vlogs
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          image: victoriametrics/victoria-logs:v1.21.0-victorialogs
+          imagePullPolicy: IfNotPresent
+          args:
+            - --envflag.enable
+            - --envflag.prefix=VM_
+            - --httpListenAddr=:9428
+            - --loggerFormat=json
+            - --retentionPeriod=1
+            - --storageDataPath=/storage
+          ports:
+            - name: http
+              containerPort: 9428
+          startupProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 1
+            periodSeconds: 1
+            timeoutSeconds: 5
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 5
+          livenessProbe:
+            failureThreshold: 10
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            tcpSocket:
+              port: http
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: server-volume
+              mountPath: /storage
+      terminationGracePeriodSeconds: 60
+      volumes:
+        - name: server-volume
+          emptyDir: {}
