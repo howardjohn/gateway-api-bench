@@ -79,7 +79,7 @@ Nginx:
 * 🚨 Nginx throughput is 20x worse than the median implementation. ([source](#traffic-performance))
 * ⚠️ Nginx does not have a separation of control plane and data plane which can be a reliability risk at high scale.
 * ⚠️ Nginx only supports a single Gateway instance.
-* ⚠️ If a route points to Traefik and another Gateway, Traefik will attempt to infinitely remove the other's status. ([source](#attached-routes))
+* ⚠️ If a route points to Nginx and another Gateway, Nginx will attempt to infinitely remove the other's status. ([source](#attached-routes))
 * ⚠️ Nginx uses substantial CPU resources to process Gateways/Routes that are not targeted at Nginx.
 
 Cilium:
