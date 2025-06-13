@@ -32,12 +32,13 @@ This repo aims to provide a comprehensive test suite that goes far beyond the co
 
 This test suite aims to cover any active, free, platform-agnostic (i.e. not a cloud vendor) implementation.
 
-|                    | Cilium                    | Envoy Gateway           | Istio        | Kgateway                | Kong                 | Traefik                 | Nginx              |
-| ------------------ | ------------------------- | ----------------------- | ------------ | ----------------------- | -------------------- | ----------------------- | ------------------ |
-| Open Source        | ✅                         | ✅                       | ✅            | ✅                       | ❌ Since 3.10         | ✅                       | ✅                  |
-| CNCF               | ✅                         | ✅                       | ✅            | ✅                       | ❌                    | ❌                       | ❌                  |
-| Enterprise Vendors | Single Vendor (Isovalent) | Single Vendor (Tetrate) | Many vendors | Single Vendor (solo.io) | Single Vendor (Kong) | Single Vendor (Traefik) | Single Vendor (F5) |
-| Dataplane Proxy    | Envoy                     | Envoy                   | Envoy        | Envoy                   | Nginx                | Traefik                 | Nginx              |
+|                        | Cilium                    | Envoy Gateway           | Istio        | Kgateway                | Kong                 | Traefik                 | Nginx              |
+|------------------------|---------------------------|-------------------------|--------------|-------------------------|----------------------|-------------------------|--------------------|
+| Open Source            | ✅                         | ✅                       | ✅            | ✅                       | ❌ Since 3.10         | ✅                       | ✅                  |
+| Open Source Foundation | CNCF                      | CNCF                    | CNCF         | CNCF                    | No foundation        | No foundation           | No foundation      |
+| Enterprise Vendors     | Single Vendor (Isovalent) | Single Vendor (Tetrate) | Many vendors | Single Vendor (solo.io) | Single Vendor (Kong) | Single Vendor (Traefik) | Single Vendor (F5) |
+| Dataplane Proxy        | Envoy                     | Envoy                   | Envoy        | Envoy                   | Nginx                | Traefik                 | Nginx              |
+| Tested Version         | v1.17.2                   | v1.4.0                  | v1.26.0      | v2.0.1                  | v3.9                 | v35.3.0                 | v1.6.2             |
 
 > [!TIP]  
 > All projects under test utilize a proxy that has usage beyond Kubernetes/Gateway API.
@@ -49,7 +50,7 @@ The rationale for some notable exclusions:
 * APISIX: no release in 2 years, does not support the current API.
 * Tyk: transitioned to a closed source, paid model in 2024.
 * Linkerd: only supports mesh, not ingress use cases which this test focuses on.
-
+* Higress: no Gateway API support.
 
 # Summary of findings
 
@@ -166,15 +167,21 @@ Below shows an example of a shared architecture with a split controller; some ha
 
 In summary:
 
-|                                | Cilium | Envoy Gateway                | Istio | Kgateway | Kong               | Traefik            | Nginx                  |
-|--------------------------------|--------|------------------------------|-------|----------|--------------------|--------------------|------------------------|
-| Dataplane/Controlplane Split   | ⚠️ <sup>1</sup>    | ✅                            | ✅     | ✅        | ✅                  | ❌                  | ❌                      |
-| Gateway instances split        | ❌      | ✅                            | ✅     | ✅        | ❌                  | ❌                  | ❌                      |
-| Dataplane in Gateway namespace | ❌      | ❌                            | ✅     | ✅        | ❌                  | ❌                  | ❌                      |
-| GatewayClass pre-created       | ✅      | ❌                            | ✅     | ✅        | ❌                  | ✅                  | ✅                      |
-| Spec complaint architecture    | ✅      | ❌ Namespace boundaries broken | ✅     | ✅        | ❌ Major violations | ❌ Major violations | ⚠️ Single Gateway only |
+|                                | Cilium          | Envoy Gateway                 | Istio | Kgateway | Kong               | Traefik            | Nginx                  |
+|--------------------------------|-----------------|-------------------------------|-------|----------|--------------------|--------------------|------------------------|
+| Dataplane/Controlplane Split   | ⚠️ <sup>1</sup> | ✅                             | ✅     | ✅        | ✅                  | ❌                  | ❌ <sup>2</sup> |
+| Gateway instances split        | ❌               | ✅                             | ✅     | ✅        | ❌                  | ❌                  | ❌                      |
+| Dataplane in Gateway namespace | ❌               | ❌                             | ✅     | ✅        | ❌                  | ❌                  | ❌                      |
+| GatewayClass pre-created       | ✅               | ❌                             | ✅     | ✅        | ❌                  | ✅                  | ✅                      |
+| Spec complaint architecture    | ✅               | ❌ Namespace boundaries broken <sup>3</sup> | ✅     | ✅        | ❌ Major violations | ❌ Major violations | ⚠️ Single Gateway only |
 
 <sup>1</sup>: `cilium-agent` is a control plane component but is involved in serving traffic.
+
+<sup>2</sup>: The [NGINX Gateway Fabric 2.0](https://community.f5.com/kb/technicalarticles/announcing-f5-nginx-gateway-fabric-2-0-0-with-a-new-distributed-architecture/341657) release was shipped around the time of publishing this, splitting the control and data plane.
+However, this comparison is still using version 1.6. A followup will test version 2.0.
+
+<sup>3</sup>: Envoy Gateway recently released a [Namespace Mode](https://gateway.envoyproxy.io/docs/tasks/operations/gateway-namespace-mode/) that can deploy the resources in the correct namespace, which may fix this issue.
+This feature was not evaluated as it was released after the comparison was done, is off-by-default, and is "alpha". A followup comparison will evaluate this mode.
 
 # Tests
 
