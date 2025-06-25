@@ -32,13 +32,13 @@ This repo aims to provide a comprehensive test suite that goes far beyond the co
 
 This test suite aims to cover any active, free, platform-agnostic (i.e. not a cloud vendor) implementation.
 
-|                        | Cilium                    | Envoy Gateway           | Istio        | Kgateway                | Kong                 | Traefik                 | Nginx              |
-|------------------------|---------------------------|-------------------------|--------------|-------------------------|----------------------|-------------------------|--------------------|
-| Open Source            | ✅                         | ✅                       | ✅            | ✅                       | ❌ Since 3.10         | ✅                       | ✅                  |
-| Open Source Foundation | CNCF                      | CNCF                    | CNCF         | CNCF                    | No foundation        | No foundation           | No foundation      |
-| Enterprise Vendors     | Single Vendor (Isovalent) | Single Vendor (Tetrate) | Many vendors | Single Vendor (solo.io) | Single Vendor (Kong) | Single Vendor (Traefik) | Single Vendor (F5) |
-| Dataplane Proxy        | Envoy                     | Envoy                   | Envoy        | Envoy                   | Nginx                | Traefik                 | Nginx              |
-| Tested Version         | v1.17.2                   | v1.4.0                  | v1.26.0      | v2.0.1                  | v3.9                 | v35.3.0                 | v1.6.2             |
+|                                       | Cilium                    | Envoy Gateway           | Istio        | Kgateway                | Kong                 | Traefik                 | Nginx              |
+|---------------------------------------|---------------------------|-------------------------|--------------|-------------------------|----------------------|-------------------------|--------------------|
+| Open Source                           | ✅                         | ✅                       | ✅            | ✅                       | ❌ Since 3.10         | ✅                       | ✅                  |
+| Open Source Foundation                | CNCF                      | CNCF                    | CNCF         | CNCF                    | No foundation        | No foundation           | No foundation      |
+| Enterprise Vendors (offering support) | Single Vendor (Isovalent) | Single Vendor (Tetrate) | Many vendors | Single Vendor (solo.io) | Single Vendor (Kong) | Single Vendor (Traefik) | Single Vendor (F5) |
+| Dataplane Proxy                       | Envoy                     | Envoy                   | Envoy        | Envoy                   | Nginx                | Traefik                 | Nginx              |
+| Tested Version                        | v1.17.2                   | v1.4.0                  | v1.26.0      | v2.0.1                  | v3.9                 | v35.3.0                 | v1.6.2             |
 
 > [!TIP]  
 > All projects under test utilize a proxy that has usage beyond Kubernetes/Gateway API.
