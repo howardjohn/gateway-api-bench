@@ -6,35 +6,14 @@ spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
 ---
 apiVersion: gateway.networking.k8s.io/v1
-kind: GatewayClass
-metadata:
-  name: kong
-  annotations:
-    konghq.com/gatewayclass-unmanaged: 'true'
-spec:
-  controllerName: konghq.com/kic-gateway-controller
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: kgateway
-  namespace: kgateway
-spec:
-  gatewayClassName: kgateway
-  listeners:
-  - protocol: HTTP
-    port: 80
-    name: http
-    allowedRoutes:
-      namespaces:
-        from: All
----
-apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: istio
   namespace: istio
 spec:
+  allowedListeners:
+    namespaces:
+      from: All
   gatewayClassName: istio
   listeners:
   - protocol: HTTP
@@ -50,6 +29,9 @@ metadata:
   name: envoy-gateway
   namespace: envoy
 spec:
+  allowedListeners:
+    namespaces:
+      from: All
   gatewayClassName: envoy-gateway
   listeners:
   - protocol: HTTP
@@ -62,40 +44,13 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: kong
-  namespace: kong
+  name: agentgateway
+  namespace: agentgateway
 spec:
-  gatewayClassName: kong
-  listeners:
-  - protocol: HTTP
-    port: 80
-    name: http
-    allowedRoutes:
-      namespaces:
-        from: All
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: traefik
-  namespace: traefik
-spec:
-  gatewayClassName: traefik
-  listeners:
-  - protocol: HTTP
-    port: 80
-    name: http
-    allowedRoutes:
-      namespaces:
-        from: All
----
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: cilium
-  namespace: cilium
-spec:
-  gatewayClassName: cilium
+  allowedListeners:
+    namespaces:
+      from: All
+  gatewayClassName: agentgateway
   listeners:
   - protocol: HTTP
     port: 80
@@ -110,6 +65,9 @@ metadata:
   name: nginx
   namespace: nginx
 spec:
+  allowedListeners:
+    namespaces:
+      from: All
   gatewayClassName: nginx
   listeners:
   - protocol: HTTP

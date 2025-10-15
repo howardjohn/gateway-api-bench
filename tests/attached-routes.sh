@@ -4,8 +4,7 @@ WD=$(dirname "$0")
 WD=$(cd "$WD"; pwd)
 source "$WD/common.sh"
 
-gateways=(istio/istio kgateway/kgateway envoy/envoy-gateway cilium/cilium nginx/nginx traefik/traefik kong/kong)
-safe_gateways=(istio/istio kgateway/kgateway envoy/envoy-gateway cilium/cilium)
+gateways=(agentgateway/agentgateway  envoy/envoy-gateway istio/istio nginx/nginx)
 mode="$1"
 shift
 
@@ -14,5 +13,5 @@ if [[ "$mode" == "split" ]];then
     go run "${WD}/attachedroutes/attachedroutes.go" --gateways="$gw" `log-flag` "$@"
   done
 else
-  go run "${WD}/attachedroutes/attachedroutes.go" --gateways="$(join_by ',' "${safe_gateways[@]}")" `log-flag` "$@"
+  go run "${WD}/attachedroutes/attachedroutes.go" --gateways="$(join_by ',' "${gateways[@]}")" `log-flag` "$@"
 fi

@@ -20,13 +20,10 @@ namespaces:
       - name: httproute
         config:
           gateways:
-          - cilium/cilium
+          - agentgateway/agentgateway
           - envoy/envoy-gateway
           - istio/istio
-          - kgateway/kgateway
           - nginx/nginx
-          - kong/kong # unsafe for concurrent runs
-          - traefik/traefik # unsafe for concurrent runs
 nodes:
 - name: node
   count: 20

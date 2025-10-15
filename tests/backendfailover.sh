@@ -6,6 +6,4 @@ source "$WD/common.sh"
 
 gateways=(agentgateway/agentgateway  envoy/envoy-gateway istio/istio nginx/nginx)
 
-for gw in "${gateways[@]}"; do
-  go run "${WD}/routechange" --gateways="$gw" "$@"
-done
+go run "${WD}/backendfailover" --gateways="$(join_by ',' "${gateways[@]}")" `log-flag` "$@"

@@ -1,5 +1,13 @@
 # Gateway API Benchmarks
 
+> [!NOTE]
+> This report is Part 1 of testing. While the report remains available on this branch, to preserve links, the testing methodologies are now snapshotted on the `v1` branch.
+> It is recommended you browse the [`v1` branch](https://github.com/howardjohn/gateway-api-bench/blob/v1/README.md).
+> Quick links to other reports:
+> * [`v2` report, which tests newer versions, more implementations, and more tests](./README-v2.md)
+>
+> It is recommended you read both versions; version 2 extends, not replaces, this version.
+
 The Kubernetes [Gateway API](https://gateway-api.sigs.k8s.io/) aims to be the next-generation networking API for Kubernetes,
 replacing the older [Ingress API](https://kubernetes.io/docs/concepts/services-networking/ingress/).
 

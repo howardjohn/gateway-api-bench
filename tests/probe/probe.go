@@ -187,7 +187,7 @@ func (a *ProbeTest) Run(ctx model.Context) error {
 	}
 
 	if err := kube.ApplyTemplate(ctx.Client, "default", backendTemplate, nil); err != nil {
-		return nil
+		return err
 	}
 	for r := range a.Config.Routes {
 		type cfg struct {
@@ -201,7 +201,7 @@ func (a *ProbeTest) Run(ctx model.Context) error {
 			Gateways:  a.Config.Gateways,
 		}
 		if err := kube.ApplyTemplate(ctx.Client, "default", cfgTemplate, data); err != nil {
-			return nil
+			return err
 		}
 		if r == a.Config.InitialRoute-1 {
 			log.Infof("applied last route, waiting...")
@@ -333,7 +333,7 @@ func (w *Watcher) Probe(ctx context.Context, hostname string, r int) error {
 	t0 := time.Now()
 	delay := time.Millisecond * 5
 	errors := 0
-	for range 10000 {
+	for range 1000000 {
 		url := fmt.Sprintf("http://%s/%d", w.Address, r)
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {

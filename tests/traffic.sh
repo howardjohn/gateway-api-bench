@@ -4,7 +4,7 @@ WD=$(dirname "$0")
 WD=$(cd "$WD"; pwd)
 source "$WD/common.sh"
 
-gateways=(istio/istio kgateway/kgateway envoy/envoy-gateway cilium/cilium nginx/nginx traefik/traefik kong/kong)
+gateways=(agentgateway/agentgateway  envoy/envoy-gateway istio/istion)
 
 cat <<EOF | kubectl apply -f - --server-side=true
 apiVersion: apps/v1
