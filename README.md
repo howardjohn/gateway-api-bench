@@ -345,12 +345,12 @@ These results were found from the Kubernetes Audit log, processed with command: 
 * Nginx, Traefik, and Envoy Gateway all have poor interactions with other implementations leading to invalid status messages.
 * Traefik stands out as by far the slowest implementation.
 * Cilium, Istio, and Kong show the fastest update times (each roughly the same).
-* Kgateway, Envoy, and Nginx (in that order) trail behind a bit, but have pretty reasonable results.
+* Kgateway, Envoy Gateway, and Nginx (in that order) trail behind a bit, but have pretty reasonable results.
 * While all implementations have a spike in CPU during their turn, Nginx consistently spikes in CPU when *unrelated controllers* are running. This indicates it is unable to ignore (from a performance perspective) configurations that are not intended for it. Kong shows similar behavior but to a lesser extent.
-* In terms of *number* of writes, we see a few differences. Envoy and Kong tend to write a lot, while the others write less frequently (differing slightly depending on the scenario). There is no true "best" value here; writing too often may lead to excessive costs, while not writing enough may lead to low responsiveness.
-  However, this is not necessarily directly correlated. While Kong writes a lot, it also has very fast response times. In contrast, Envoy writes a lot but is on the slower side.
+* In terms of *number* of writes, we see a few differences. Envoy Gateway and Kong tend to write a lot, while the others write less frequently (differing slightly depending on the scenario). There is no true "best" value here; writing too often may lead to excessive costs, while not writing enough may lead to low responsiveness.
+  However, this is not necessarily directly correlated. While Kong writes a lot, it also has very fast response times. In contrast, Envoy Gateway writes a lot but is on the slower side.
 * Looking at the graphs also gives some interesting insights.
-  * Envoy speeds up at the end of setup, and slows down at the end of teardown. I would **guess** this has to do with favoring updates to the HTTPRoutes themselves during the slow times.
+  * Envoy Gateway speeds up at the end of setup, and slows down at the end of teardown. I would **guess** this has to do with favoring updates to the HTTPRoutes themselves during the slow times.
   * In contrast, Kgateway tends to initially write fast then slow down towards the end of setup (tear down, however, remains fast).
 
 ## Route propagation time
@@ -387,7 +387,7 @@ Looking at the control plane and data plane resource utilization during the test
 * Nginx and Envoy Gateway data planes both scale up memory usage as more routes are added. (Note: nginx control and data plane are co-located so cannot be viewed independently).
 * All control planes scale up memory usage as more routes are added.
 * CPU usage for both data plane and control plane remains mostly flat for all implementations, with Envoy Gateway data plane increasing slightly as more routes are added.
-  * Cilium uses by far the most CPU, followed by Nginx and Envoy, then Kgateway and Istio which are about the same. Cilium's control plane use 7.5x the CPU of Istio, and Envoy Gateway uses 2.9x.
+  * Cilium uses by far the most CPU, followed by Nginx and Envoy Gateway, then Kgateway and Istio which are about the same. Cilium's control plane use 7.5x the CPU of Istio, and Envoy Gateway uses 2.9x.
 * Both Kong and Traefik have very consistently (slow) times, at 3s and 2s respectively.
 
 While Cilium behaves reasonably at lower route scales, it has complete failure once the route size gets too large.
@@ -395,10 +395,10 @@ After a certain threshold of total size of Envoy configuration is passed, Cilium
 This includes adding new routes, but also changing existing configuration.
 When this happens, there is no feedback to the user; routes are reported as "ready" in the status even when they will never become ready.
 
-Both Cilium and Envoy encounter errors during the test, while all others complete with zero errors.
+Both Cilium and Envoy Gateway encounter errors during the test, while all others complete with zero errors.
 Cilium's errors, however, only occur during the very first route creation, likely indicating the Gateway is not fully setup until the first route attaches.
 In practice, this is unlikely to have any production impact.
-Envoy's, however, occur throughout the test, giving errors on nearly every single route, total to 15,000 failed requests through the test.
+Envoy Gateway's, however, occur throughout the test, giving errors on nearly every single route, total to 15,000 failed requests through the test.
 
 ## Route Changes
 
