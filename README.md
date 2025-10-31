@@ -9,7 +9,7 @@ Aside from the tests only covering the basics, most implementations do not repor
 
 This repo aims to provide a comprehensive test suite that goes far beyond the conformance tests, to help users better understand the real-world behavior of implementations.
 
-*Disclaimer: Myself, and my employer, have associations and contributions to many of these projects (Istio, Envoy Gateway, Kgateway, Cilium). While I have attempted to minimize bias in this report, any testing has some bias. I encourage you to reproduce the results yourself!*
+*Disclaimer: Myself, and my employer, have associations and contributions to many of these projects (Istio, Envoy, Kgateway, Cilium). While I have attempted to minimize bias in this report, any testing has some bias. I encourage you to reproduce the results yourself!*
 
 - [Overview](#overview)
 - [Summary of findings](#summary-of-findings)
