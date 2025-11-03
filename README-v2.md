@@ -44,7 +44,7 @@ This section is entirely my subjective analysis of the results, so I would encou
 
 Since the last report a short 3 months ago, many implementations have made some big changes!
 
-**Nginx** releases a v2.0 re-architecture that appears to address some of the [architectural findings](#architecture-comparison), and have reached out to let me know some of the other issues in the original report have been fixed.
+**Nginx** releases a v2.0 re-architecture that appears to address some of the [architectural findings](./README.md#architecture-comparison), and have reached out to let me know some of the other issues in the original report have been fixed.
 
 **Envoy Gateway** community [formally responded to the report](https://github.com/envoyproxy/gateway/discussions/6285#discussioncomment-13575356), denying many of the reported findings. There are a few claims to break down here:
 * For the route change test, where Envoy Gateway saw downtime, they claim the issue is a ["fundamental issue around Envoy delta update"](https://github.com/envoyproxy/gateway/discussions/6285#discussioncomment-13579398). However, 4 Envoy-based implementations were tested; Envoy Gateway was the only implementation that had this, indicating that it is not a fundamental issue with Envoy, but rather a limitation found only in Envoy Gateway.
@@ -292,7 +292,7 @@ Because all 4 control planes happen to be written in Go, we can compare the Go g
 
 ![](./imgs/route-scale-v2-gc.png "Route scale test, control plane GC usage")
 
-These results vary even more and explain some of the other CPU and memory numbers - each implementation has wildly different allocation patterns. At steady state, Envoy Gateway is allocating 10,000,000 objects per second compared to only only 6,000 from Agentgateway, and allocates over 2,000x more memory!
+These results vary even more and explain some of the other CPU and memory numbers - each implementation has wildly different allocation patterns. At steady state, Envoy Gateway is allocating 10,000,000 objects per second compared to only 6,000 from Agentgateway, and allocates over 2,000x more memory!
 
 ![](./imgs/route-scale-gc-graph.png "Route scale test, control plane GC usage graph")
 
@@ -319,7 +319,7 @@ The next test runs a fixed 30k QPS and records P99 latency. As nginx could not s
 
 ![](./imgs/traffic-latency-v2.png "Traffic latency test")
 
-Overall, aside from Nginx due to its lack fo connection pooling, all three implementations show strong traffic performance.
+Overall, aside from Nginx due to its lack of connection pooling, all three implementations show strong traffic performance.
 
 ### ListenerSet Scale
 
