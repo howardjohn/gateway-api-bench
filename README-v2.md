@@ -75,7 +75,7 @@ Since some time has passed, and I continue to be asked about this, including by 
 ### HAProxy
 
 HAProxy still only supports the [legacy API from years ago](https://github.com/haproxytech/kubernetes-ingress/blob/bd3d95792225c6fc677d3034a21d9b70931d6d51/go.mod#L30) so was not suitable for inclusion.
-I am quit surprised by this given their team is stating they are [deprecating their existing controller in favor of Gateway API](https://www.reddit.com/r/kubernetes/comments/1l44d4y/comment/mw6jr2m/) and recommending users to migrate to the Gateway API.
+I am quite surprised by this given their team is stating they are [deprecating their existing controller in favor of Gateway API](https://www.reddit.com/r/kubernetes/comments/1l44d4y/comment/mw6jr2m/) and recommending users to migrate to the Gateway API.
 Perhaps a future version will be useable and can be tested!
 
 ### APISIX
