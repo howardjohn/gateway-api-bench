@@ -1,0 +1,300 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: haproxy-unified-gateway
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    run: haproxy-unified-gateway
+  name: haproxy-unified-gateway
+  namespace: haproxy-unified-gateway
+spec:
+  # specify the number of controller replicas
+  replicas: 1
+  selector:
+    matchLabels:
+      run: haproxy-unified-gateway
+  template:
+    metadata:
+      labels:
+        run: haproxy-unified-gateway
+    spec:
+      securityContext:
+        sysctls:
+        - name: net.ipv4.ip_unprivileged_port_start
+          value: "0"
+
+      serviceAccountName: haproxy-unified-gateway
+      containers:
+        - name: haproxy-unified-gateway
+          # specify the container image, tag and pull policy
+          image: docker.io/haproxytech/haproxy-unified-gateway:0.7.0
+          # image: haproxytech/haproxy-unified-gateway:latest
+          # imagePullPolicy: this is set to never for kind cluster usage
+          imagePullPolicy: Always
+          # imagePullPolicy: Never
+          resources:
+            limits:
+              memory: 2560Mi
+            requests:
+              memory: 2048Mi
+          lifecycle:
+            preStop:
+              exec:
+                # Send SIGUSR1 directly to the haproxy process
+                command: ["/bin/sh", "-c", "kill -SIGUSR1 $(cat /var/run/haproxy.pid)"]
+          args:
+            # specify the hugconf CRD location, all other params are in configuration file
+            - --hugconf-crd=haproxy-unified-gateway/hugconf
+          securityContext:
+            runAsNonRoot: true
+            allowPrivilegeEscalation: false
+            runAsUser: 1000
+            runAsGroup: 1000
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - NET_BIND_SERVICE
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            # specify the container ports, it needs to align with gateway configuration
+            - name: http
+              containerPort: 31080
+            - name: https
+              containerPort: 31443
+            # additional container port to specify the stats port
+            - name: stat
+              containerPort: 31024
+          env:
+            # specify the environment variables needed for logs and metrics
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: haproxy-unified-gateway
+  namespace: haproxy-unified-gateway
+spec:
+  selector:
+    run: haproxy-unified-gateway
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 31080
+      targetPort: 31080
+      # nodePort is needed for NodePort service type
+      nodePort: 31080
+      protocol: TCP
+    - name: https
+      port: 31443
+      targetPort: 31443
+      # nodePort is needed for NodePort service type
+      nodePort: 31443
+      protocol: TCP
+    - name: stat
+      port: 31024
+      targetPort: 31024
+    - name: http-port
+      port: 80
+      targetPort: 80
+---
+apiVersion: gate.v3.haproxy.org/v3
+kind: HugConf
+metadata:
+  name: hugconf
+  namespace: haproxy-unified-gateway
+spec:
+  logging:
+    defaultLevel: "Debug"
+    categoryLevelList:
+      # - category: "gate"
+      #   level: "Debug"
+      # - category: "status"
+      #   level: "Debug"
+      - category: "k8s"
+        level: "Info"
+---
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: haproxy-unified-gateway
+  namespace: haproxy-unified-gateway
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: haproxy-unified-gateway
+rules:
+  - apiGroups:
+    - "apiextensions.k8s.io"
+    resources:
+    - customresourcedefinitions
+    verbs:
+    - get
+    - list
+    - watch
+    - update
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+      - endpoints
+      - nodes
+      - pods
+      - services
+      - namespaces
+      - events
+      - serviceaccounts
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+      - update
+  - apiGroups:
+      - "extensions"
+      - "networking.k8s.io"
+    resources:
+      - ingresses
+      - ingresses/status
+      - ingressclasses
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - "extensions"
+      - "networking.k8s.io"
+    resources:
+      - ingresses/status
+    verbs:
+      - update
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - patch
+      - update
+  - apiGroups:
+      - extensions
+    resources:
+      - ingresses
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - core.haproxy.org
+    resources:
+      - "*"
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - ingress.v1.haproxy.org
+    resources:
+      - "*"
+    verbs:
+      - get
+      - list
+      - watch
+      - update
+  - apiGroups:
+      - "discovery.k8s.io"
+    resources:
+      - endpointslices
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+    - "apps"
+    resources:
+      - replicasets
+      - deployments
+      - daemonsets
+    verbs:
+      - get
+      - list
+  - apiGroups:
+    - gateway.networking.k8s.io
+    resources:
+      - gatewayclasses
+      - gateways
+      - httproutes
+      - referencegrants
+      - grpcroutes
+    verbs:
+      - list
+      - watch
+  - apiGroups:
+    - gateway.networking.k8s.io
+    resources:
+      - gatewayclasses/status
+      - gateways/status
+      - httproutes/status
+      - referencegrants/status
+      - grpcroutes/status
+    verbs:
+      - get
+      - update
+      - patch
+  - apiGroups:
+    - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - create
+      - get
+      - update
+  - apiGroups:
+    - gate.v3.haproxy.org
+    resources:
+      - huggates
+      - hugconfs
+      - backends
+    verbs:
+      - get
+      - list
+      - watch
+
+---
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: haproxy-unified-gateway
+  namespace: haproxy-unified-gateway
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: haproxy-unified-gateway
+subjects:
+  - kind: ServiceAccount
+    name: haproxy-unified-gateway
+    namespace: haproxy-unified-gateway

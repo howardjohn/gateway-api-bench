@@ -6,6 +6,13 @@ spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
 ---
 apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata:
+  name: haproxy
+spec:
+  controllerName: gate.haproxy.org/hug
+---
+apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: istio
@@ -69,6 +76,24 @@ spec:
     namespaces:
       from: All
   gatewayClassName: nginx
+  listeners:
+  - protocol: HTTP
+    port: 80
+    name: http
+    allowedRoutes:
+      namespaces:
+        from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: haproxy
+  namespace: haproxy
+spec:
+  allowedListeners:
+    namespaces:
+      from: All
+  gatewayClassName: haproxy
   listeners:
   - protocol: HTTP
     port: 80

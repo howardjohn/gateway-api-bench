@@ -78,6 +78,28 @@ HAProxy still only supports the [legacy API from years ago](https://github.com/h
 I am quite surprised by this given their team is stating they are [deprecating their existing controller in favor of Gateway API](https://www.reddit.com/r/kubernetes/comments/1l44d4y/comment/mw6jr2m/) and recommending users to migrate to the Gateway API.
 Perhaps a future version will be useable and can be tested!
 
+**Update 11/14/25:** HAProxy announced [updated Gateway API support](https://www.haproxy.com/blog/announcing-haproxy-unified-gateway-beta) a few days after I published this, so I decided to try it out.
+Note: this is classified as "beta", so some rough edges are to be expected.
+
+The setup phase was rough.
+There is no Helm chart, so I followed their [example deployment](https://github.com/haproxytech/haproxy-unified-gateway/tree/dev/example/deploy/hug) of plain YAML.
+However, this didn't work.
+* The install doesn't install the required CRDs, which are undocumented and I only found with a few minutes of searching around the repo.
+* The deployment points to an image that doesn't exist. I had to dig their the Docker Hub repo to find a working image.
+* When creating a Gateway, its instantly marked as "Programmed" even when it wasn't. It wasn't programmed because I chose to bind to port 80, which it didn't have permissions to do.
+* Once I manually added the permissions, I had to also manually update the Service to expose it.
+* Even once fully setup, there is no Gateway address in the status, making most of the tests not work. Since I was curious, I changed some tests to manually hardcode the address which is why I was able to do a few tests.
+
+HAProxy follows the [same problematic architecture as some others tested in the original report](./README.md#architecture-comparison): there is a single Deployment that contains the control plane and all instances of Gateways co-located in one pod. This violates the security and deployment model of Gateway API.
+
+In the [Route Propagation test](./README.md#route-propagation-time), HAProxy takes 5s to propagate a route, compared to 5-100ms for leading implementations.
+
+For the [traffic performance testing](./README.md#traffic-performance), HAProxy and Agentgateway were roughly comparable, usually within +/-10% of each other on each various test. However, I encountered issues with the HTTPRoute -- despite it being a valid route, with a valid status reported, the route got a 404. Only after adding some additional matchers to the route did it work at all.
+
+In the [Route Scale test](./README.md#route-scale), HAProxy seemed to do pretty well, but its hard to judge due to two of the issues previously mentioned: they have a joint control plane and data plane (so we cannot isolate which of these is performing), and they throttle updates to every 5s which means we are trading off availability for resource consumption, which is not something the test measures.
+
+Overall, its great to see another project moving to the Gateway API, but for now I think HAProxy is still a work in progress. I look forward to watching its progress.
+
 ### APISIX
 
 APISIX looked promising, as the new 2.0 release includes modern support for Gateway API!
