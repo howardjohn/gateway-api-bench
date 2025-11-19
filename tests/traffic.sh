@@ -4,7 +4,8 @@ WD=$(dirname "$0")
 WD=$(cd "$WD"; pwd)
 source "$WD/common.sh"
 
-gateways=(agentgateway/agentgateway  envoy/envoy-gateway istio/istio)
+# Skip nginx
+unset gateways[3]
 
 cat <<EOF | kubectl apply -f - --server-side=true
 apiVersion: apps/v1

@@ -4,9 +4,8 @@ WD=$(dirname "$0")
 WD=$(cd "$WD"; pwd)
 source "$WD/common.sh"
 
-gateways=(agentgateway/agentgateway envoy/envoy-gateway istio/istio)
-mode="$1"
-shift
+# Skip nginx
+unset gateways[3]
 
 if [[ "$mode" == "split" ]];then
   for gw in "${gateways[@]}"; do

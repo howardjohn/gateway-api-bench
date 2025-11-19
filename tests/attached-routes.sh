@@ -4,7 +4,6 @@ WD=$(dirname "$0")
 WD=$(cd "$WD"; pwd)
 source "$WD/common.sh"
 
-gateways=(agentgateway/agentgateway  envoy/envoy-gateway istio/istio nginx/nginx)
 mode="$1"
 shift
 
