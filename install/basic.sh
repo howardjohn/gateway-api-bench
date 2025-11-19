@@ -13,7 +13,7 @@ helm upgrade --install --create-namespace --namespace kgateway-system --version 
 # Enable Alpha APIs for ListenerSet testing
 helm upgrade --install --namespace kgateway-system --version v2.2.0-alpha.1 kgateway oci://cr.kgateway.dev/kgateway-dev/charts/kgateway \
   --set agentgateway.enabled=true \
-  --set agentgateway.enableAlphaAPIs=true \ 
+  --set agentgateway.enableAlphaAPIs=true \
   --set envoy.enabled=false
 
 cat <<EOF | helm upgrade --install istiod --create-namespace --namespace istio-system --version 1.27.1 oci://gcr.io/istio-release/charts/istiod -f -
