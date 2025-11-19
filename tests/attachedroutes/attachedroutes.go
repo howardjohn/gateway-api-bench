@@ -262,7 +262,7 @@ func (a *AttachedRoutes) Report() {
 				})
 			}
 		}
-		if err := victoria.Report(a.Config.VictoriaLogs, entries); err != nil {
+		if err := victoria.Report(a.Config.VictoriaLogs, []string{"gateway", "test"}, entries); err != nil {
 			log.Errorf("failed to report victoria logs: %v", err)
 		} else {
 			log.Infof("reported victoria logs")

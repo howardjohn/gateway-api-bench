@@ -263,7 +263,7 @@ func (a *ChangeTest) Run(ctx model.Context) error {
 		return err
 	}
 
-	reporter := victoria.NewBatchReporter[VicLogEntry](a.Config.VictoriaLogs)
+	reporter := victoria.NewBatchReporter[VicLogEntry](a.Config.VictoriaLogs, []string{"gateway", "test"})
 	defer reporter.Close()
 
 	g := errgroup.Group{}
