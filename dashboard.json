@@ -1,683 +1,1614 @@
 {
-  "apiVersion": "dashboard.grafana.app/v1beta1",
-  "kind": "Dashboard",
-  "metadata": {
-    "name": "gateway_showdown"
-  },
-  "spec": {
-    "annotations": {},
-    "editable": true,
-    "fiscalYearStartMonth": 0,
-    "graphTooltip": 1,
-    "panels": [
-      {
-        "collapsed": false,
-        "gridPos": {
-          "h": 1,
-          "w": 24,
-          "x": 0,
-          "y": 0
-        },
-        "id": 0,
-        "panels": [],
-        "title": "Overview",
-        "type": "row"
+  "annotations": {},
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
       },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "$datasource"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "custom": {
-              "fillOpacity": 10,
-              "gradientMode": "opacity",
-              "showPoints": "never"
-            },
-            "unit": "bytes"
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 10,
-          "w": 12,
-          "x": 0,
-          "y": 1
-        },
-        "interval": "5s",
-        "options": {
-          "legend": {
-            "calcs": [
-              "last",
-              "max",
-              "mean"
-            ],
-            "displayMode": "table",
-            "placement": "right",
-            "showLegend": true,
-            "sortBy": "Last",
-            "sortDesc": true
-          },
-          "tooltip": {
-            "mode": "single",
-            "sort": "asc"
-          }
-        },
-        "repeatDirection": "h",
-        "targets": [
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"envoy-gateway-system\",container=\"\",pod=~\"envoy-envoy-envoy-gateway.*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"kgateway\",container=\"\",pod=~\".*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"istio\",container=\"\",pod=~\".*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum (container_memory_working_set_bytes{namespace=\"kube-system\",container=\"\",pod=~\"(^cilium-.....$|cilium-envoy-.*)\"})",
-            "legendFormat": "cilium (Envoy + Agent)",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"traefik-system\",container=\"\",pod=~\".*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"kong-system\",container=\"\",pod=~\"kong-controller-.*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"nginx-system\",container=\"\",pod=~\".*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          }
-        ],
-        "title": "Memory (Data Plane)",
-        "transformations": [
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{5}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{9}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{10}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{8}",
-              "renamePattern": "$1"
-            }
-          }
-        ],
-        "transparent": false,
-        "type": "timeseries"
+      "id": 0,
+      "panels": [],
+      "title": "Overview",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
       },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "$datasource"
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "bytes"
         },
-        "fieldConfig": {
-          "defaults": {
-            "custom": {
-              "fillOpacity": 10,
-              "gradientMode": "opacity",
-              "showPoints": "never"
-            }
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 10,
-          "w": 12,
-          "x": 12,
-          "y": 1
-        },
-        "interval": "5s",
-        "options": {
-          "legend": {
-            "calcs": [
-              "last",
-              "max",
-              "mean"
-            ],
-            "displayMode": "table",
-            "placement": "right",
-            "showLegend": true,
-            "sortBy": "Last",
-            "sortDesc": true
-          },
-          "tooltip": {
-            "mode": "single",
-            "sort": "asc"
-          }
-        },
-        "repeatDirection": "h",
-        "targets": [
-          {
-            "expr": "sum by (pod) (irate(container_cpu_usage_seconds_total{namespace=\"envoy-gateway-system\",container=\"\",pod=~\"envoy-envoy-envoy-gateway.*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (irate(container_cpu_usage_seconds_total{namespace=\"kgateway\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (irate(container_cpu_usage_seconds_total{namespace=\"istio\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum (irate(container_cpu_usage_seconds_total{namespace=\"kube-system\",container=\"\",pod=~\"(^cilium-.....$|cilium-envoy-.*)\"}[$__rate_interval]))",
-            "legendFormat": "cilium (Envoy + Agent)",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (irate(container_cpu_usage_seconds_total{namespace=\"traefik-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (irate(container_cpu_usage_seconds_total{namespace=\"kong-system\",container=\"\",pod=~\"kong-controller-.*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (irate(container_cpu_usage_seconds_total{namespace=\"nginx-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          }
-        ],
-        "title": "CPU (Data Plane)",
-        "transformations": [
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{5}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{9}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{10}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{8}",
-              "renamePattern": "$1"
-            }
-          }
-        ],
-        "transparent": false,
-        "type": "timeseries"
+        "overrides": []
       },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "$datasource"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "custom": {
-              "fillOpacity": 10,
-              "gradientMode": "opacity",
-              "showPoints": "never"
-            },
-            "unit": "bytes"
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 10,
-          "w": 12,
-          "x": 0,
-          "y": 11
-        },
-        "interval": "5s",
-        "options": {
-          "legend": {
-            "calcs": [
-              "last",
-              "max",
-              "mean"
-            ],
-            "displayMode": "table",
-            "placement": "right",
-            "showLegend": true,
-            "sortBy": "Last",
-            "sortDesc": true
-          },
-          "tooltip": {
-            "mode": "single",
-            "sort": "asc"
-          }
-        },
-        "repeatDirection": "h",
-        "targets": [
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"envoy-gateway-system\",container=\"\",pod=~\"^envoy-gateway-.*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"kgateway-system\",container=\"\",pod=~\".*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"istio-system\",container=\"\",pod=~\".*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"kube-system\",container=\"\",pod=~\"cilium-operator-.*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"traefik-system\",container=\"\",pod=~\".*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"kong-system\",container=\"\",pod=~\"kong-controller-.*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"nginx-system\",container=\"\",pod=~\".*\"})",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          }
-        ],
-        "title": "Memory (Control Plane)",
-        "transformations": [
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{5}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{9}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{10}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{8}",
-              "renamePattern": "$1"
-            }
-          }
-        ],
-        "transparent": false,
-        "type": "timeseries"
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 1
       },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "$datasource"
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
         },
-        "fieldConfig": {
-          "defaults": {
-            "custom": {
-              "fillOpacity": 10,
-              "gradientMode": "opacity",
-              "showPoints": "never"
-            }
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 10,
-          "w": 12,
-          "x": 12,
-          "y": 11
-        },
-        "interval": "5s",
-        "options": {
-          "legend": {
-            "calcs": [
-              "last",
-              "max",
-              "mean"
-            ],
-            "displayMode": "table",
-            "placement": "right",
-            "showLegend": true,
-            "sortBy": "Last",
-            "sortDesc": true
-          },
-          "tooltip": {
-            "mode": "single",
-            "sort": "asc"
-          }
-        },
-        "repeatDirection": "h",
-        "targets": [
-          {
-            "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"envoy-gateway-system\",container=\"\",pod=~\"^envoy-gateway-.*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"kgateway-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"istio-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"kube-system\",container=\"\",pod=~\"cilium-operator-.*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"traefik-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"kong-system\",container=\"\",pod=~\"kong-controller-.*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          },
-          {
-            "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"nginx-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
-            "legendFormat": "{{pod}}",
-            "refId": ""
-          }
-        ],
-        "title": "CPU (Control Plane)",
-        "transformations": [
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{5}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{9}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{10}",
-              "renamePattern": "$1"
-            }
-          },
-          {
-            "id": "renameByRegex",
-            "options": {
-              "regex": "(.+?)-[a-z0-9]{8}",
-              "renamePattern": "$1"
-            }
-          }
-        ],
-        "transparent": false,
-        "type": "timeseries"
-      },
-      {
-        "collapsed": false,
-        "gridPos": {
-          "h": 1,
-          "w": 24,
-          "x": 0,
-          "y": 21
-        },
-        "id": 0,
-        "panels": [],
-        "title": "Scenarios",
-        "type": "row"
-      },
-      {
-        "datasource": {
-          "type": "victoriametrics-logs-datasource"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "custom": {
-              "fillOpacity": 10,
-              "gradientMode": "opacity",
-              "pointSize": 3,
-              "showPoints": "always",
-              "spanNulls": 60000
-            }
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 10,
-          "w": 12,
-          "x": 0,
-          "y": 22
-        },
-        "interval": "5s",
-        "options": {
-          "legend": {
-            "calcs": [
-              "max",
-              "mean"
-            ],
-            "displayMode": "table",
-            "placement": "right",
-            "showLegend": true,
-            "sortBy": "Last",
-            "sortDesc": true
-          },
-          "tooltip": {
-            "mode": "single",
-            "sort": "asc"
-          }
-        },
-        "repeatDirection": "h",
-        "targets": [
-          {
-            "expr": "{gateway!=\"\",test=\"attachedroutes\"}",
-            "maxLines": 999999,
-            "queryType": "instant",
-            "refId": ""
-          }
-        ],
-        "title": "Attached Routes Test",
-        "transformations": [
-          {
-            "id": "extractFields",
-            "options": {
-              "format": "json",
-              "source": "labels"
-            }
-          },
-          {
-            "id": "convertFieldType",
-            "options": {
-              "conversions": [
-                {
-                  "destinationType": "number",
-                  "targetField": "value"
-                }
-              ]
-            }
-          },
-          {
-            "id": "groupingToMatrix",
-            "options": {
-              "columnField": "gateway",
-              "emptyValue": "null",
-              "rowField": "Time",
-              "valueField": "value"
-            }
-          }
-        ],
-        "transparent": false,
-        "type": "timeseries"
-      },
-      {
-        "datasource": {
-          "type": "victoriametrics-logs-datasource"
-        },
-        "fieldConfig": {
-          "defaults": {
-            "custom": {
-              "axisSoftMin": 0,
-              "fillOpacity": 10,
-              "gradientMode": "opacity",
-              "pointSize": 3,
-              "showPoints": "always"
-            },
-            "unit": "\u00b5s"
-          },
-          "overrides": []
-        },
-        "gridPos": {
-          "h": 10,
-          "w": 12,
-          "x": 12,
-          "y": 22
-        },
-        "interval": "5s",
-        "options": {
-          "legend": {
-            "calcs": [
-              "max",
-              "mean"
-            ],
-            "displayMode": "table",
-            "placement": "right",
-            "showLegend": true,
-            "sortBy": "Last",
-            "sortDesc": true
-          },
-          "tooltip": {
-            "mode": "single",
-            "sort": "asc"
-          }
-        },
-        "repeatDirection": "h",
-        "targets": [
-          {
-            "expr": "{gateway!=\"\",test=\"probe\"}",
-            "maxLines": 999999,
-            "queryType": "instant",
-            "refId": ""
-          }
-        ],
-        "title": "Probe Test",
-        "transformations": [
-          {
-            "id": "extractFields",
-            "options": {
-              "format": "json",
-              "source": "labels"
-            }
-          },
-          {
-            "id": "convertFieldType",
-            "options": {
-              "conversions": [
-                {
-                  "destinationType": "number",
-                  "targetField": "value"
-                }
-              ]
-            }
-          },
-          {
-            "id": "groupingToMatrix",
-            "options": {
-              "columnField": "gateway",
-              "emptyValue": "null",
-              "rowField": "Time",
-              "valueField": "value"
-            }
-          }
-        ],
-        "transparent": false,
-        "type": "timeseries"
-      }
-    ],
-    "refresh": "15s",
-    "schemaVersion": 36,
-    "style": "dark",
-    "templating": {
-      "list": [
-        {
-          "auto": false,
-          "auto_count": 30,
-          "auto_min": "10s",
-          "hide": 0,
-          "id": "00000000-0000-0000-0000-000000000000",
-          "includeAll": false,
-          "multi": false,
-          "name": "datasource",
-          "query": "prometheus",
-          "skipUrlSync": false,
-          "type": "datasource"
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
         }
-      ]
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"envoy\",container=\"\",pod=~\".*\"}[60s]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"istio\",container=\"\",pod=~\".*\"}[60s]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"nginx\",container=\"\",pod=~\".*\"}[60s]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"agentgateway\",container=\"\",pod=~\".*\"}[60s]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        }
+      ],
+      "title": "Memory (Data Plane)",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{5}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{9}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{10}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{8}",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "transparent": false,
+      "type": "timeseries"
     },
-    "time": {
-      "from": "now-30m",
-      "to": "now"
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 1
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (irate(container_cpu_usage_seconds_total{namespace=\"envoy\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (irate(container_cpu_usage_seconds_total{namespace=\"istio\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (irate(container_cpu_usage_seconds_total{namespace=\"nginx\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (irate(container_cpu_usage_seconds_total{namespace=\"agentgateway\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        }
+      ],
+      "title": "CPU (Data Plane)",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{5}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{9}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{10}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{8}",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "transparent": false,
+      "type": "timeseries"
     },
-    "timezone": "browser",
-    "title": "Gateway API Comparison",
-    "uid": "gateway_showdown"
-  }
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 11
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"envoy-gateway-system\",container=\"\",pod=~\".*\"}[60s]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"istio-system\",container=\"\",pod=~\".*\"}[60s]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"nginx-system\",container=\"\",pod=~\".*\"}[60s]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"kgateway-system\",container=\"\",pod=~\".*\"}[60s]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        }
+      ],
+      "title": "Memory (Control Plane)",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{5}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{9}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{10}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{8}",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 11
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"envoy-gateway-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"istio-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"nginx-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"kgateway-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        }
+      ],
+      "title": "CPU (Control Plane)",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{5}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{9}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{10}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{8}",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 21
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (rate(container_network_transmit_bytes_total{namespace=\"envoy-gateway-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (rate(container_network_transmit_bytes_total{namespace=\"istio-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (rate(container_network_transmit_bytes_total{namespace=\"nginx-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (rate(container_network_transmit_bytes_total{namespace=\"kgateway-system\",container=\"\",pod=~\".*\"}[$__rate_interval]))",
+          "legendFormat": "{{pod}}",
+          "refId": ""
+        }
+      ],
+      "title": "Network",
+      "transformations": [
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{5}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{9}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{10}",
+            "renamePattern": "$1"
+          }
+        },
+        {
+          "id": "renameByRegex",
+          "options": {
+            "regex": "(.+?)-[a-z0-9]{8}",
+            "renamePattern": "$1"
+          }
+        }
+      ],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 0,
+      "panels": [],
+      "title": "Scenarios",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "victoriametrics-logs-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "pointSize": 3,
+            "showPoints": "always",
+            "spanNulls": 60000
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "{gateway!=\"\",test=\"attachedroutes\"}",
+          "legendFormat": "",
+          "maxLines": 999999,
+          "queryType": "instant",
+          "refId": ""
+        }
+      ],
+      "title": "Attached Routes Test",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "format": "json",
+            "source": "labels"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "value"
+              }
+            ]
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "gateway",
+            "emptyValue": "null",
+            "rowField": "Time",
+            "valueField": "value"
+          }
+        }
+      ],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "victoriametrics-logs-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisSoftMin": 0,
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "pointSize": 3,
+            "showPoints": "always"
+          },
+          "unit": "\u00b5s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "{gateway!=\"\",test=\"probe\"}",
+          "legendFormat": "",
+          "maxLines": 999999,
+          "queryType": "instant",
+          "refId": ""
+        }
+      ],
+      "title": "Probe Test",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "format": "json",
+            "source": "labels"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "value"
+              }
+            ]
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "gateway",
+            "emptyValue": "null",
+            "rowField": "Time",
+            "valueField": "value"
+          }
+        }
+      ],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "victoriametrics-logs-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisSoftMin": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "pointSize": 3,
+            "showPoints": "always",
+            "spanNulls": 1000
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byRegexp",
+              "options": "/.*\\(false\\)/"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 42
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Total",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "{gateway!=\"\",test=\"backendfailover\"} | filter (backend:=\"backend-unhealthy\" OR  backend:=\"\")| stats by (gateway,success,backend)  count()",
+          "legendFormat": "{{gateway}} ({{success}})",
+          "maxLines": 999999,
+          "queryType": "statsRange",
+          "refId": "",
+          "step": "1s"
+        }
+      ],
+      "title": "Backend Failover Test",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "format": "json",
+            "source": "labels"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "value"
+              }
+            ]
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "gateway",
+            "emptyValue": "null",
+            "rowField": "Time",
+            "valueField": "value"
+          }
+        }
+      ],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "victoriametrics-logs-datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "axisSoftMin": 0,
+            "drawStyle": "points",
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "pointSize": 3,
+            "showPoints": "always",
+            "spanNulls": 0
+          },
+          "unit": "\u00b5s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 42
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "{stream=\"latency\"}",
+          "legendFormat": "",
+          "maxLines": 999999,
+          "queryType": "instant",
+          "refId": ""
+        }
+      ],
+      "title": "Fortio Latency",
+      "transformations": [
+        {
+          "id": "extractFields",
+          "options": {
+            "format": "json",
+            "source": "labels"
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "value"
+              }
+            ]
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "gateway",
+            "emptyValue": "null",
+            "rowField": "Time",
+            "valueField": "value"
+          }
+        },
+        {
+          "id": "groupingToMatrix",
+          "options": {
+            "columnField": "subStream",
+            "emptyValue": "null",
+            "rowField": "Time",
+            "valueField": "value"
+          }
+        }
+      ],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 52
+      },
+      "id": 0,
+      "panels": [],
+      "title": "Details",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "container"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 53
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (go_memstats_stack_inuse_bytes{namespace=\"kgateway-system\"})",
+          "legendFormat": "Stack {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_inuse_bytes{namespace=\"kgateway-system\"})",
+          "legendFormat": "Heap (In Use) {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_alloc_bytes{namespace=\"kgateway-system\"})",
+          "legendFormat": "Heap (Allocated) {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_sys_bytes{namespace=\"kgateway-system\"})",
+          "legendFormat": "System {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_idle_bytes{namespace=\"kgateway-system\"})",
+          "legendFormat": "Idle {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_released_bytes{namespace=\"kgateway-system\"})",
+          "legendFormat": "Release {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"kgateway-system\",image=\"\"}[60s]))",
+          "legendFormat": "Container {{pod}}",
+          "refId": "container"
+        }
+      ],
+      "title": "Go Memory (Kgateway)",
+      "transformations": [],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "Bps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "objects"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "c/s"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 53
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (rate(go_memstats_alloc_bytes_total{namespace=\"kgateway-system\"}[$__rate_interval]))",
+          "legendFormat": "Bytes {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (rate(go_memstats_mallocs_total{namespace=\"kgateway-system\"}[$__rate_interval]))",
+          "legendFormat": "Objects {{pod}}",
+          "refId": "objects"
+        }
+      ],
+      "title": "Allocations (Kgateway)",
+      "transformations": [],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "container"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 63
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (go_memstats_stack_inuse_bytes{namespace=\"istio-system\"})",
+          "legendFormat": "Stack {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_inuse_bytes{namespace=\"istio-system\"})",
+          "legendFormat": "Heap (In Use) {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_alloc_bytes{namespace=\"istio-system\"})",
+          "legendFormat": "Heap (Allocated) {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_sys_bytes{namespace=\"istio-system\"})",
+          "legendFormat": "System {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_idle_bytes{namespace=\"istio-system\"})",
+          "legendFormat": "Idle {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_released_bytes{namespace=\"istio-system\"})",
+          "legendFormat": "Release {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"istio-system\",image=\"\"}[60s]))",
+          "legendFormat": "Container {{pod}}",
+          "refId": "container"
+        }
+      ],
+      "title": "Go Memory (Istio)",
+      "transformations": [],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "Bps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "objects"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "c/s"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 63
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (rate(go_memstats_alloc_bytes_total{namespace=\"istio-system\"}[$__rate_interval]))",
+          "legendFormat": "Bytes {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (rate(go_memstats_mallocs_total{namespace=\"istio-system\"}[$__rate_interval]))",
+          "legendFormat": "Objects {{pod}}",
+          "refId": "objects"
+        }
+      ],
+      "title": "Allocations (Istio)",
+      "transformations": [],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "container"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 73
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (go_memstats_stack_inuse_bytes{namespace=\"envoy-gateway-system\"})",
+          "legendFormat": "Stack {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_inuse_bytes{namespace=\"envoy-gateway-system\"})",
+          "legendFormat": "Heap (In Use) {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_alloc_bytes{namespace=\"envoy-gateway-system\"})",
+          "legendFormat": "Heap (Allocated) {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_sys_bytes{namespace=\"envoy-gateway-system\"})",
+          "legendFormat": "System {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_idle_bytes{namespace=\"envoy-gateway-system\"})",
+          "legendFormat": "Idle {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_released_bytes{namespace=\"envoy-gateway-system\"})",
+          "legendFormat": "Release {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"envoy-gateway-system\",image=\"\"}[60s]))",
+          "legendFormat": "Container {{pod}}",
+          "refId": "container"
+        }
+      ],
+      "title": "Go Memory (Envoy)",
+      "transformations": [],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "Bps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "objects"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "c/s"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 73
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (rate(go_memstats_alloc_bytes_total{namespace=\"envoy-gateway-system\"}[$__rate_interval]))",
+          "legendFormat": "Bytes {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (rate(go_memstats_mallocs_total{namespace=\"envoy-gateway-system\"}[$__rate_interval]))",
+          "legendFormat": "Objects {{pod}}",
+          "refId": "objects"
+        }
+      ],
+      "title": "Allocations (Envoy)",
+      "transformations": [],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "bytes"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "container"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 2
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 0,
+        "y": 83
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (go_memstats_stack_inuse_bytes{namespace=\"nginx-system\"})",
+          "legendFormat": "Stack {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_inuse_bytes{namespace=\"nginx-system\"})",
+          "legendFormat": "Heap (In Use) {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_alloc_bytes{namespace=\"nginx-system\"})",
+          "legendFormat": "Heap (Allocated) {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_sys_bytes{namespace=\"nginx-system\"})",
+          "legendFormat": "System {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_idle_bytes{namespace=\"nginx-system\"})",
+          "legendFormat": "Idle {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (go_memstats_heap_released_bytes{namespace=\"nginx-system\"})",
+          "legendFormat": "Release {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (last_over_time(container_memory_working_set_bytes{namespace=\"nginx-system\",image=\"\"}[60s]))",
+          "legendFormat": "Container {{pod}}",
+          "refId": "container"
+        }
+      ],
+      "title": "Go Memory (Nginx)",
+      "transformations": [],
+      "transparent": false,
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "$datasource"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "fillOpacity": 10,
+            "gradientMode": "opacity",
+            "showPoints": "never"
+          },
+          "unit": "Bps"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "objects"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "unit",
+                "value": "c/s"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 12,
+        "x": 12,
+        "y": 83
+      },
+      "interval": "5s",
+      "options": {
+        "legend": {
+          "calcs": [
+            "last",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "sortBy": "Last",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "asc"
+        }
+      },
+      "repeatDirection": "h",
+      "targets": [
+        {
+          "expr": "sum by (pod) (rate(go_memstats_alloc_bytes_total{namespace=\"nginx-system\"}[$__rate_interval]))",
+          "legendFormat": "Bytes {{pod}}",
+          "refId": ""
+        },
+        {
+          "expr": "sum by (pod) (rate(go_memstats_mallocs_total{namespace=\"nginx-system\"}[$__rate_interval]))",
+          "legendFormat": "Objects {{pod}}",
+          "refId": "objects"
+        }
+      ],
+      "title": "Allocations (Nginx)",
+      "transformations": [],
+      "transparent": false,
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "15s",
+  "schemaVersion": 36,
+  "style": "dark",
+  "templating": {
+    "list": [
+      {
+        "auto": false,
+        "auto_count": 30,
+        "auto_min": "10s",
+        "hide": 0,
+        "id": "00000000-0000-0000-0000-000000000000",
+        "includeAll": false,
+        "multi": false,
+        "name": "datasource",
+        "query": "prometheus",
+        "skipUrlSync": false,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "title": "Gateway API Comparison",
+  "uid": "gateway_showdown"
 }
