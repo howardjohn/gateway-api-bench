@@ -4,8 +4,6 @@ WD=$(dirname "$0")
 WD=$(cd "$WD"; pwd)
 source "$WD/common.sh"
 
-# Skip nginx
-unset gateways[3]
 
 if [[ "$mode" == "split" ]];then
   for gw in "${gateways[@]}"; do
