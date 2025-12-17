@@ -178,7 +178,7 @@ In summary:
 |                                | Cilium          | Envoy Gateway                 | Istio | Kgateway | Kong               | Traefik            | Nginx                  |
 |--------------------------------|-----------------|-------------------------------|-------|----------|--------------------|--------------------|------------------------|
 | Dataplane/Controlplane Split   | ⚠️ <sup>1</sup> | ✅                             | ✅     | ✅        | ✅                  | ❌                  | ❌ <sup>2</sup> |
-| Gateway instances split        | ❌               | ✅                             | ✅     | ✅        | ❌                  | ❌                  | ❌                      |
+| Gateway instances split        | ❌ <sup>4</sup> | ✅                             | ✅     | ✅        | ❌                  | ❌                  | ❌                      |
 | Dataplane in Gateway namespace | ❌               | ❌                             | ✅     | ✅        | ❌                  | ❌                  | ❌                      |
 | GatewayClass pre-created       | ✅               | ❌                             | ✅     | ✅        | ❌                  | ✅                  | ✅                      |
 | Spec complaint architecture    | ✅               | ❌ Namespace boundaries broken <sup>3</sup> | ✅     | ✅        | ❌ Major violations | ❌ Major violations | ⚠️ Single Gateway only |
@@ -190,6 +190,8 @@ However, this comparison is still using version 1.6. A followup will test versio
 
 <sup>3</sup>: Envoy Gateway recently released a [Namespace Mode](https://gateway.envoyproxy.io/docs/tasks/operations/gateway-namespace-mode/) that can deploy the resources in the correct namespace, which may fix this issue.
 This feature was not evaluated as it was released after the comparison was done, is off-by-default, and is "alpha". A followup comparison will evaluate this mode.
+
+<sup>4</sup>: The Cilium community [does not agree](https://github.com/cilium/cilium/issues/39974#issuecomment-3555661850) with the assessment that a shared data plane is a risk. I encourage you to draw your own conclusions (ideally, based on your own testing!).
 
 # Tests
 
