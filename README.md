@@ -181,7 +181,7 @@ In summary:
 | Gateway instances split        | ❌ <sup>4</sup> | ✅                             | ✅     | ✅        | ❌                  | ❌                  | ❌                      |
 | Dataplane in Gateway namespace | ❌               | ❌                             | ✅     | ✅        | ❌                  | ❌                  | ❌                      |
 | GatewayClass pre-created       | ✅               | ❌                             | ✅     | ✅        | ❌                  | ✅                  | ✅                      |
-| Spec complaint architecture    | ✅               | ❌ Namespace boundaries broken <sup>3</sup> | ✅     | ✅        | ❌ Major violations | ❌ Major violations | ⚠️ Single Gateway only |
+| Spec compliant architecture    | ✅               | ❌ Namespace boundaries broken <sup>3</sup> | ✅     | ✅        | ❌ Major violations | ❌ Major violations | ⚠️ Single Gateway only |
 
 <sup>1</sup>: `cilium-agent` is a control plane component but is involved in serving traffic.
 
