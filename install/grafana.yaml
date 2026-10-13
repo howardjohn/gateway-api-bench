@@ -8,7 +8,7 @@ metadata:
     helm.sh/chart: grafana-8.6.3
     app.kubernetes.io/name: grafana
     app.kubernetes.io/instance: grafana
-    app.kubernetes.io/version: "12.0.1"
+    app.kubernetes.io/version: "13.2.3"
   name: grafana
   namespace: monitoring
 ---
@@ -22,7 +22,7 @@ metadata:
     helm.sh/chart: grafana-8.6.3
     app.kubernetes.io/name: grafana
     app.kubernetes.io/instance: grafana
-    app.kubernetes.io/version: "12.0.1"
+    app.kubernetes.io/version: "13.2.3"
 data:
 
   grafana.ini: |
@@ -91,7 +91,7 @@ metadata:
     helm.sh/chart: grafana-8.6.3
     app.kubernetes.io/name: grafana
     app.kubernetes.io/instance: grafana
-    app.kubernetes.io/version: "12.0.1"
+    app.kubernetes.io/version: "13.2.3"
 spec:
   type: LoadBalancer
   ports:
@@ -113,7 +113,7 @@ metadata:
     helm.sh/chart: grafana-8.6.3
     app.kubernetes.io/name: grafana
     app.kubernetes.io/instance: grafana
-    app.kubernetes.io/version: "12.0.1"
+    app.kubernetes.io/version: "13.2.3"
 spec:
   replicas: 1
   revisionHistoryLimit: 10
@@ -129,7 +129,7 @@ spec:
         helm.sh/chart: grafana-8.6.3
         app.kubernetes.io/name: grafana
         app.kubernetes.io/instance: grafana
-        app.kubernetes.io/version: "12.0.1"
+        app.kubernetes.io/version: "13.2.3"
         sidecar.istio.io/inject: "false"
       annotations:
         checksum/config: 68c00ea91b7ba5c04efc55555ef2307f52aaf738b04e9665e91bb756c8f32b22
@@ -142,7 +142,7 @@ spec:
       enableServiceLinks: true
       containers:
         - name: grafana
-          image: "docker.io/grafana/grafana:12.0.1"
+          image: "docker.io/grafana/grafana:13.2.3"
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
@@ -174,8 +174,9 @@ spec:
               containerPort: 9094
               protocol: UDP
           env:
-            - name: GF_INSTALL_PLUGINS
-              value: victoriametrics-logs-datasource
+            # Pinned: v0.27.0+ hard caps queries at 10000 lines, which truncates the test result panels
+            - name: GF_PLUGINS_PREINSTALL_SYNC
+              value: victoriametrics-logs-datasource@0.26.3
             - name: POD_IP
               valueFrom:
                 fieldRef:
@@ -198,6 +199,16 @@ spec:
               value: "admin"
             - name: "GF_SECURITY_ADMIN_USER"
               value: "admin"
+            - name: GF_RENDERING_SERVER_URL
+              value: http://grafana-image-renderer.monitoring:8081/render
+            - name: GF_RENDERING_CALLBACK_URL
+              value: http://grafana.monitoring:3000/
+            # Must match AUTH_TOKEN on the renderer; Grafana refuses to start with the default token
+            - name: GF_RENDERING_RENDERER_TOKEN
+              value: gateway-api-bench
+            # Used by dashboard "Export as image", which has no scale option in the UI
+            - name: GF_RENDERING_DEFAULT_IMAGE_SCALE
+              value: "2"
           livenessProbe:
             failureThreshold: 10
             httpGet:
@@ -214,4 +225,86 @@ spec:
           configMap:
             name: grafana
         - name: storage
+          emptyDir: {}
+---
+# Source: grafana/templates/image-renderer-service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-image-renderer
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: grafana-image-renderer
+    app.kubernetes.io/instance: grafana
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8081
+      protocol: TCP
+      targetPort: 8081
+  selector:
+    app.kubernetes.io/name: grafana-image-renderer
+    app.kubernetes.io/instance: grafana
+---
+# Source: grafana/templates/image-renderer-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-image-renderer
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: grafana-image-renderer
+    app.kubernetes.io/instance: grafana
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: grafana-image-renderer
+      app.kubernetes.io/instance: grafana
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: grafana-image-renderer
+        app.kubernetes.io/instance: grafana
+        sidecar.istio.io/inject: "false"
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: grafana-image-renderer
+          image: "docker.io/grafana/grafana-image-renderer:v5.12.6"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          env:
+            - name: HTTP_PORT
+              value: "8081"
+            - name: AUTH_TOKEN
+              value: gateway-api-bench
+            - name: "HTTP_HOST"
+              value: "0.0.0.0"
+            - name: "XDG_CACHE_HOME"
+              value: "/tmp/.chromium"
+            - name: "XDG_CONFIG_HOME"
+              value: "/tmp/.chromium"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - mountPath: /tmp
+              name: image-renderer-tmpfs
+      volumes:
+        - name: image-renderer-tmpfs
           emptyDir: {}

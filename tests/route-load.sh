@@ -1,4 +1,7 @@
 #!/bin/bash
+WD=$(dirname "$0")
+WD=$(cd "$WD"; pwd)
+source "$WD/common.sh"
 
 namespaces="${1:-10}"
 routes="${2:-100}"
@@ -19,12 +22,10 @@ namespaces:
       configs:
       - name: httproute
         config:
+          hostnames: 3
           gateways:
-          - agentgateway/agentgateway
-          - envoy/envoy-gateway
-          - istio/istio
-          - nginx/nginx
+$(gateways-yaml "          ")
 nodes:
 - name: node
-  count: 20
+  count: 60
 EOF

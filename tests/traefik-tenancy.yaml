@@ -1,0 +1,141 @@
+# Demonstrates Traefik's shared data plane breaking Gateway isolation.
+#
+# Two tenants each get their own Gateway, restricted to routes from their own namespace.
+# tenant-a serves app.example.com. tenant-b, which should only be able to affect its own Gateway, creates a
+# route for the same hostname. With a Gateway per data plane (every other implementation) the two do not
+# interact: each Gateway has its own address. With Traefik, both Gateways share one deployment, one
+# address, and one routing table, so tenant-b's route can take over traffic sent to tenant-a's Gateway.
+#
+# Check:
+#   kubectl get gateway -n tenant-a -n tenant-b       # both Gateways report the same address
+#   curl -s -D - -o /dev/null -H 'Host: app.example.com' http://$(kubectl get gateway -n tenant-a tenant-a -o jsonpath='{.status.addresses[0].value}')/ | grep x-tenant
+#   -> x-tenant: tenant-b means tenant-b hijacked tenant-a's traffic
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-a
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tenant-b
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: tenant-a
+  namespace: tenant-a
+spec:
+  gatewayClassName: traefik
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      namespaces:
+        from: Same
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: tenant-b
+  namespace: tenant-b
+spec:
+  gatewayClassName: traefik
+  listeners:
+  - name: http
+    protocol: HTTP
+    port: 80
+    allowedRoutes:
+      namespaces:
+        from: Same
+---
+# tenant-a's legitimate route
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: app
+  namespace: tenant-a
+spec:
+  parentRefs:
+  - name: tenant-a
+  hostnames: [app.example.com]
+  rules:
+  - backendRefs: [{name: backend, port: 80}]
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set: [{name: x-tenant, value: tenant-a}]
+---
+# tenant-b's route: attached only to tenant-b's own Gateway, but for tenant-a's hostname, with a more
+# specific match so it wins if both routes end up in the same routing table
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: app
+  namespace: tenant-b
+spec:
+  parentRefs:
+  - name: tenant-b
+  hostnames: [app.example.com]
+  rules:
+  - matches:
+    - path: {type: PathPrefix, value: /}
+      headers: [{name: user-agent, type: RegularExpression, value: ".*"}]
+    backendRefs: [{name: backend, port: 80}]
+    filters:
+    - type: ResponseHeaderModifier
+      responseHeaderModifier:
+        set: [{name: x-tenant, value: tenant-b}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: tenant-a
+spec:
+  selector:
+    matchLabels: {app: backend}
+  template:
+    metadata:
+      labels: {app: backend}
+    spec:
+      containers:
+      - name: backend
+        image: howardjohn/hyper-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: tenant-a
+spec:
+  selector: {app: backend}
+  ports:
+  - {name: http, port: 80, targetPort: 8080}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: tenant-b
+spec:
+  selector:
+    matchLabels: {app: backend}
+  template:
+    metadata:
+      labels: {app: backend}
+    spec:
+      containers:
+      - name: backend
+        image: howardjohn/hyper-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: tenant-b
+spec:
+  selector: {app: backend}
+  ports:
+  - {name: http, port: 80, targetPort: 8080}

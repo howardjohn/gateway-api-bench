@@ -1,4 +1,11 @@
 #!/bin/bash
+WD=$(dirname "$0")
+WD=$(cd "$WD"; pwd)
+source "$WD/common.sh"
+
+# Traefik does not program ListenerSets (they stay Accepted=Unknown/Pending), so leave it out of this test
+gateways=("${gateways[@]/traefik\/traefik}")
+read -r -a gateways <<< "${gateways[*]}"
 
 namespaces="${1:-10}"
 routes="${2:-100}"
@@ -7,72 +14,75 @@ cat <<EOF | pilot-load cluster --config -
 jitter:
   workloads: "2s"
   config: "1s"
-gracePeriod: 500ms
+gracePeriod: 100ms
 namespaces:
   - name: mesh
     replicas: ${namespaces}
-    configs:
-    - name: tls-secret
-      config:
-        Name: ns-cert
     applications:
-    - name: app
+    - name: tenant
       replicas: ${routes}
       pods: 1
       type: plain
       configs:
       - name: route
+        count: 16
         config:
           gateways:
-          - agentgateway/agentgateway
-          # - envoy/envoy-gateway
-          - istio/istio
-          # - nginx/nginx
-          routes: 16
+$(gateways-yaml "          ")
       - name: listenerset
         config:
           gateways:
-          - agentgateway/agentgateway
-          # - envoy/envoy-gateway
-          - istio/istio
-          # - nginx/nginx
+$(gateways-yaml "          ")
+      - name: cert
+        config:
+          hosts: 16
 nodes:
 - name: node
   count: 20
 templates:
+  cert: |
+    #refresh=true
+    {{ \$names := list }}
+    {{ range \$i := until (int .hosts) }}{{ \$names = append \$names (printf "h-%d.%s.%s.example.com" \$i \$.Name \$.Namespace) }}{{ end }}
+    {{ \$c := genSelfSignedCertWithKey (first \$names) nil \$names 3650 (genPrivateKey "ecdsa") }}
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: {{.Name}}-cert
+    type: kubernetes.io/tls
+    data:
+      tls.crt: {{ \$c.Cert | b64enc }}
+      tls.key: {{ \$c.Key | b64enc }}
   route: |
     #refresh=true
-    {{ range \$rc := until (int .routes) }}
     apiVersion: gateway.networking.k8s.io/v1
     kind: HTTPRoute
     metadata:
-      name: {{\$.Name}}-{{.}}
+      name: {{.Name}}-{{.Index}}
     spec:
       hostnames:
-        - {{\$.Name}}.example.com
+        - h-{{.Index}}.{{.Name}}.{{.Namespace}}.example.com
       parentRefs:
-      {{ range \$gw := \$.gateways }}
+      {{ range \$gw := .gateways }}
       {{ \$spl := split "/" \$gw }}
       - name: {{\$.Name}}-{{\$spl._1}}
-        kind: XListenerSet
-        group: gateway.networking.x-k8s.io
+        kind: ListenerSet
+        group: gateway.networking.k8s.io
       {{ end }}
       rules:
         - backendRefs:
-            - name: {{\$.Name}}
+            - name: {{.Name}}
               port: 80
           matches:
             - path:
                 type: PathPrefix
-                value: /{{.}}/{{\$.RandNumber}}
-    ---
-    {{ end }}
+                value: /{{.Index}}/{{.RandNumber}}
   listenerset: |
     #refresh=false
     {{ range \$gw := .gateways }}
     {{ \$spl := split "/" \$gw }}
-    apiVersion: gateway.networking.x-k8s.io/v1alpha1
-    kind: XListenerSet
+    apiVersion: gateway.networking.k8s.io/v1
+    kind: ListenerSet
     metadata:
       name: {{\$.Name}}-{{\$spl._1}}
     spec:
@@ -83,7 +93,7 @@ templates:
         group: gateway.networking.k8s.io
       listeners:
         - name: {{\$.Name}}
-          hostname: {{\$.Name}}.example.com
+          hostname: "*.{{\$.Name}}.{{\$.Namespace}}.example.com"
           protocol: HTTPS
           port: 443
           tls:
@@ -91,7 +101,7 @@ templates:
             certificateRefs:
               - kind: Secret
                 group: ""
-                name: ns-cert
+                name: {{\$.Name}}-cert
     ---
     {{ end }}
 EOF

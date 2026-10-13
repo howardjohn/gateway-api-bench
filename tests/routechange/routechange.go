@@ -13,6 +13,8 @@ import (
 	"github.com/howardjohn/pilot-load/pkg/simulation/model"
 	"github.com/spf13/pflag"
 	"golang.org/x/sync/errgroup"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	gateway "sigs.k8s.io/gateway-api/apis/v1beta1"
 
@@ -90,6 +92,15 @@ spec:
         env:
         - name: PORT
           value: 8080,8081
+        # Routes alternate between both ports, so the pod is only ready once both accept connections
+        startupProbe:
+          tcpSocket:
+            port: 8081
+          periodSeconds: 1
+        readinessProbe:
+          tcpSocket:
+            port: 8080
+          periodSeconds: 1
         resources:
           requests:
             memory: "64Mi"
@@ -166,6 +177,9 @@ func (a *ChangeTest) Run(ctx model.Context) error {
 	}
 
 	if err := kube.ApplyTemplate(ctx.Client, "default", backendTemplate, nil); err != nil {
+		return err
+	}
+	if err := waitForRollout(ctx, types.NamespacedName{Namespace: "default", Name: "backend"}); err != nil {
 		return err
 	}
 
@@ -307,4 +321,32 @@ func (w *Watcher) Probe(ctx context.Context, hostname string) error {
 			return nil
 		}
 	}
+}
+
+// waitForRollout waits until every replica is on the latest template and ready, like `kubectl rollout status`.
+func waitForRollout(ctx model.Context, d types.NamespacedName) error {
+	for {
+		dep, err := ctx.Client.Kube().AppsV1().Deployments(d.Namespace).Get(ctx.Context, d.Name, metav1.GetOptions{})
+		if err != nil {
+			return err
+		}
+		if rolledOut(dep) {
+			return nil
+		}
+		if !sleep.UntilContext(ctx.Context, 500*time.Millisecond) {
+			return fmt.Errorf("context cancelled waiting for %v", d)
+		}
+	}
+}
+
+func rolledOut(d *appsv1.Deployment) bool {
+	want := int32(1)
+	if d.Spec.Replicas != nil {
+		want = *d.Spec.Replicas
+	}
+	s := d.Status
+	return s.ObservedGeneration >= d.Generation &&
+		s.UpdatedReplicas == want &&
+		s.Replicas == want &&
+		s.AvailableReplicas == want
 }
