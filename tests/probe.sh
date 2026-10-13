@@ -4,6 +4,11 @@ WD=$(dirname "$0")
 WD=$(cd "$WD"; pwd)
 source "$WD/common.sh"
 
+# Set SKIP_SLOW=true to drop implementations that take too long to converge (Traefik)
+if [[ "${SKIP_SLOW}" == "true" ]]; then
+  gateways=("${gateways[@]/traefik\/traefik}")
+  read -r -a gateways <<< "${gateways[*]}"
+fi
 
 if [[ "$mode" == "split" ]];then
   for gw in "${gateways[@]}"; do

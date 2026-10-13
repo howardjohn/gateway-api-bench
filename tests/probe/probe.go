@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/howardjohn/pilot-load/pkg/flag"
@@ -29,6 +30,7 @@ type Config struct {
 	VictoriaLogs string
 	Routes       int
 	InitialRoute int
+	Burst        bool
 }
 
 func main() {
@@ -45,6 +47,7 @@ func Command(f *pflag.FlagSet) flag.Command {
 	flag.Register(f, &cfg.InitialRoute, "initial-route", "which route to start tests on")
 	flag.Register(f, &cfg.VictoriaLogs, "victoria", "victoria-logs address")
 	flag.Register(f, &cfg.GracePeriod, "gracePeriod", "delay between each application")
+	flag.Register(f, &cfg.Burst, "burst", "apply routes back to back without waiting for traffic; probe them in order in the background")
 	return flag.Command{
 		Name:        "gatewayapi-probe",
 		Description: "apply routes and measure time until traffic is accepted",
@@ -70,8 +73,9 @@ func parseNamespacedName(gw string) types.NamespacedName {
 }
 
 type ProbeTest struct {
-	Config Config
-	State  map[types.NamespacedName]*Watcher
+	Config   Config
+	State    map[types.NamespacedName]*Watcher
+	reportMu sync.Mutex
 }
 
 var _ model.Simulation = &ProbeTest{}
@@ -189,18 +193,11 @@ func (a *ProbeTest) Run(ctx model.Context) error {
 	if err := kube.ApplyTemplate(ctx.Client, "default", backendTemplate, nil); err != nil {
 		return err
 	}
+	if a.Config.Burst {
+		return a.runBurst(ctx)
+	}
 	for r := range a.Config.Routes {
-		type cfg struct {
-			Index     int
-			Namespace string
-			Gateways  []string
-		}
-		data := cfg{
-			Index:     r,
-			Namespace: "default",
-			Gateways:  a.Config.Gateways,
-		}
-		if err := kube.ApplyTemplate(ctx.Client, "default", cfgTemplate, data); err != nil {
+		if err := a.applyRoute(ctx, r); err != nil {
 			return err
 		}
 		if r == a.Config.InitialRoute-1 {
@@ -212,10 +209,11 @@ func (a *ProbeTest) Run(ctx model.Context) error {
 			continue
 		}
 		g := errgroup.Group{}
+		t0 := time.Now()
 		for _, gw := range a.State {
 			hostname := fmt.Sprintf("%d-route.example.com", r)
 			g.Go(func() error {
-				if err := gw.Probe(ctx.Context, hostname, r); err != nil {
+				if err := gw.Probe(ctx.Context, hostname, r, t0); err != nil {
 					return fmt.Errorf("%v: %v", gw.Name, err)
 				}
 				return nil
@@ -230,6 +228,103 @@ func (a *ProbeTest) Run(ctx model.Context) error {
 		}
 	}
 
+	ctx.Cancel()
+	return nil
+}
+
+func (a *ProbeTest) applyRoute(ctx model.Context, r int) error {
+	type cfg struct {
+		Index     int
+		Namespace string
+		Gateways  []string
+	}
+	data := cfg{
+		Index:     r,
+		Namespace: "default",
+		Gateways:  a.Config.Gateways,
+	}
+	return kube.ApplyTemplate(ctx.Client, "default", cfgTemplate, data)
+}
+
+type appliedRoute struct {
+	Index int
+	Time  time.Time
+}
+
+// runBurst applies all routes back to back, without waiting for any to be ready. Each gateway probes
+// the routes in order in the background, starting route N only once route N has been applied, and
+// measures latency from when route N was applied. A gateway that keeps up finishes right after the
+// last apply; a slow one builds up a backlog.
+func (a *ProbeTest) runBurst(ctx model.Context) error {
+	for r := range a.Config.InitialRoute {
+		if err := a.applyRoute(ctx, r); err != nil {
+			return err
+		}
+	}
+	if a.Config.InitialRoute > 0 {
+		log.Infof("applied initial routes, waiting...")
+		time.Sleep(time.Second * 10)
+	}
+
+	// Each gateway gets its own queue of applied routes, so a slow gateway doesn't block the others
+	queues := map[types.NamespacedName]chan appliedRoute{}
+	for name := range a.State {
+		queues[name] = make(chan appliedRoute, a.Config.Routes)
+	}
+
+	g := errgroup.Group{}
+	for name, gw := range a.State {
+		q := queues[name]
+		g.Go(func() error {
+			for ar := range q {
+				hostname := fmt.Sprintf("%d-route.example.com", ar.Index)
+				if err := gw.Probe(ctx.Context, hostname, ar.Index, ar.Time); err != nil {
+					return fmt.Errorf("%v: %v", gw.Name, err)
+				}
+			}
+			log.WithLabels("gateway", gw.Name).Infof("all routes ready")
+			return nil
+		})
+	}
+
+	done := make(chan struct{})
+	go func() {
+		// Periodically report while probes are running
+		for {
+			select {
+			case <-done:
+				return
+			case <-time.After(10 * time.Second):
+				a.Report()
+			}
+		}
+	}()
+
+	start := time.Now()
+	var applyErr error
+	for r := a.Config.InitialRoute; r < a.Config.Routes; r++ {
+		if err := a.applyRoute(ctx, r); err != nil {
+			applyErr = err
+			break
+		}
+		applied := appliedRoute{Index: r, Time: time.Now()}
+		for _, q := range queues {
+			q <- applied
+		}
+	}
+	for _, q := range queues {
+		close(q)
+	}
+	log.Infof("applied all routes in %v", time.Since(start))
+
+	err := g.Wait()
+	close(done)
+	if applyErr != nil {
+		return applyErr
+	}
+	if err != nil {
+		return err
+	}
 	ctx.Cancel()
 	return nil
 }
@@ -278,35 +373,62 @@ func (a *ProbeTest) AllEqual(key types.NamespacedName, want int) error {
 }
 
 func (a *ProbeTest) Report() {
+	// Burst mode reports from a background goroutine; don't let two reports send the same samples
+	a.reportMu.Lock()
+	defer a.reportMu.Unlock()
 	for _, gw := range a.State {
 		totalErrors := 0
 		totalLatency := time.Duration(0)
 		maxLatency := time.Duration(0)
+		gw.mu.Lock()
 		for _, sample := range gw.Samples {
 			totalErrors += sample.Errors
 			totalLatency += sample.Latency
 			maxLatency = max(maxLatency, sample.Latency)
 		}
+		gw.mu.Unlock()
 		// TODO: average latency, total latency, max
 		log.WithLabels("gateway", gw.Name, "errors", totalErrors, "runtime", totalLatency, "max", maxLatency).Info("test complete")
 	}
 
 	if a.Config.VictoriaLogs != "" {
+		test := "probe"
+		if a.Config.Burst {
+			test = "probe-burst"
+		}
 		var entries []VicLogEntry
+		reported := map[*Watcher]int{}
 		for name, w := range a.State {
-			for _, sample := range w.Samples {
+			w.mu.Lock()
+			samples := w.Samples[w.Reported:]
+			reported[w] = len(w.Samples)
+			w.mu.Unlock()
+			// Only send samples not already reported; Report is called periodically
+			for _, sample := range samples {
+				t := sample.Time
+				if a.Config.Burst {
+					// Burst gateways can complete many routes at the same instant, which would stack them on
+					// one point; plot by when the route was applied instead.
+					t = sample.Start
+				}
 				entries = append(entries, VicLogEntry{
 					Message: "event",
-					Test:    "probe",
+					Test:    test,
 					Gateway: name.String(),
-					Time:    sample.Time.UnixNano(),
+					Time:    t.UnixNano(),
 					Value:   sample.Latency.Microseconds(),
+					Iter:    sample.Iter,
 				})
 			}
 		}
 		if err := victoria.Report(a.Config.VictoriaLogs, []string{"gateway", "test"}, entries); err != nil {
 			log.Errorf("failed to report victoria logs: %v", err)
 		} else {
+			for w, n := range reported {
+				w.mu.Lock()
+				w.Reported = n
+				w.mu.Unlock()
+			}
 			log.Infof("reported victoria logs")
 		}
 	}
@@ -318,6 +440,7 @@ type VicLogEntry struct {
 	Test    string `json:"test"`
 	Time    int64  `json:"_time"`
 	Value   int64  `json:"value"` // Microseconds
+	Iter    int    `json:"iter"`
 }
 
 type Watcher struct {
@@ -326,11 +449,15 @@ type Watcher struct {
 	Address string
 	Last    int
 	Samples []Sample
+	// Reported is the number of Samples already sent to VictoriaLogs
+	Reported int
+	// mu guards Samples and Reported, which are reported while burst probes are running
+	mu sync.Mutex
 }
 
-func (w *Watcher) Probe(ctx context.Context, hostname string, r int) error {
+// Probe waits until hostname returns 200, recording the latency since t0
+func (w *Watcher) Probe(ctx context.Context, hostname string, r int, t0 time.Time) error {
 	log := log.WithLabels("gateway", w.Name.String(), "iter", r)
-	t0 := time.Now()
 	delay := time.Millisecond * 5
 	errors := 0
 	for range 1000000 {
@@ -354,12 +481,15 @@ func (w *Watcher) Probe(ctx context.Context, hostname string, r int) error {
 			continue
 		case 200:
 			tn := time.Now()
+			w.mu.Lock()
 			w.Samples = append(w.Samples, Sample{
+				Start:   t0,
 				Time:    time.Now(),
 				Latency: tn.Sub(t0),
 				Iter:    r,
 				Errors:  errors,
 			})
+			w.mu.Unlock()
 			// success!
 			// Todo continue a few to ensure we get 200 consistently
 			log.WithLabels("latency", tn.Sub(t0)).Infof("probe completed: %v", c)
@@ -375,7 +505,9 @@ func (w *Watcher) Probe(ctx context.Context, hostname string, r int) error {
 }
 
 type Sample struct {
-	Iter    int
+	Iter int
+	// Start is when probing began (burst mode: when the route was applied)
+	Start   time.Time
 	Time    time.Time
 	Latency time.Duration
 	Errors  int

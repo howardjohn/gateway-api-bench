@@ -3,10 +3,11 @@ module github.com/howardjohn/gateway-api-bench
 go 1.24.3
 
 require (
-	github.com/howardjohn/pilot-load v0.1.5-0.20251027172835-53e11f0a9e0d
+	github.com/howardjohn/pilot-load v0.1.5-0.20261013165645-76b48fa4ef62
 	github.com/spf13/pflag v1.0.10
 	golang.org/x/sync v0.17.0
 	istio.io/istio v0.0.0-20251015190908-65bd03319f07
+	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	sigs.k8s.io/gateway-api v1.4.0
 )
@@ -19,6 +20,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Masterminds/sprig v2.22.0+incompatible // indirect
 	github.com/Masterminds/sprig/v3 v3.3.0 // indirect
+	github.com/agentgateway/agentgateway/api v0.0.0-20260306202740-8ffa38af6bfb // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
@@ -112,14 +114,13 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20250811230008-5f3141c8851a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250826171959-ef028d996bc1 // indirect
 	google.golang.org/grpc v1.76.0 // indirect
-	google.golang.org/protobuf v1.36.10 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	istio.io/api v1.28.0-alpha.0.0.20251015201407-f6b4b4f56db2 // indirect
 	istio.io/client-go v1.28.0-alpha.0.0.20251015201706-99349a9d18ee // indirect
-	k8s.io/api v0.34.1 // indirect
 	k8s.io/apiextensions-apiserver v0.34.1 // indirect
 	k8s.io/apiserver v0.34.1 // indirect
 	k8s.io/client-go v0.34.1 // indirect

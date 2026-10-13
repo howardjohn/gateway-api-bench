@@ -1,624 +1,594 @@
 # Gateway API Benchmarks
 
 > [!NOTE]
-> This report is Part 1 of testing. While the report remains available on this branch, to preserve links, the testing methodologies are now snapshotted on the `v1` branch.
-> It is recommended you browse the [`v1` branch](https://github.com/howardjohn/gateway-api-bench/blob/v1/README.md).
-> Quick links to other reports:
-> * [`v2` report, which tests newer versions, more implementations, and more tests](./README-v2.md)
+> This report is Part 3 of testing. Older versions can be found below:
+> * [`v1` report](./README-v1.md)
+> * [`v2` report](./README-v2.md)
 >
-> It is recommended you read both versions; version 2 extends, not replaces, this version.
+> Note: each version tests different implementations and runs different tests, so it's worth looking through each one.
 
 The Kubernetes [Gateway API](https://gateway-api.sigs.k8s.io/) aims to be the next-generation networking API for Kubernetes,
 replacing the older [Ingress API](https://kubernetes.io/docs/concepts/services-networking/ingress/).
 
 Like Ingress, it comes with a number of different implementations of the API.
-These implementations have **wildly** different behaviors, strengths, and weaknesses that are not caught by the [conformance tests](https://gateway-api.sigs.k8s.io/implementations/v1.3/).
-Aside from the tests only covering the basics, most implementations do not report conformance test results at all, and most of the implementations that do report a result skip over half of the tests!
+These implementations have **wildly** different behaviors, strengths, and weaknesses that are not caught by the [conformance tests](https://gateway-api.sigs.k8s.io/docs/implementations/versions/v1.6/).
 
-This repo aims to provide a comprehensive test suite that goes far beyond the conformance tests, to help users better understand the real-world behavior of implementations.
+This repo aims to provide a comprehensive test suite that goes beyond the conformance tests, to help users better understand the real-world behavior of implementations.
 
-*Disclaimer: Myself, and my employer, have associations and contributions to many of these projects (Istio, Envoy, Kgateway, Cilium). While I have attempted to minimize bias in this report, any testing has some bias. I encourage you to reproduce the results yourself!*
+## About the tests
 
+*Disclaimer: Myself, and my employer, have associations and contributions to many of these projects (Istio, Envoy, Kgateway, Agentgateway). While I have attempted to minimize bias in this report, any testing has some bias. I encourage you to reproduce the results yourself!*
+*Also: no part of this report is AI generated*
+
+> [!NOTE]
+> This test aims to provide factual reproducible data. However, past reports showed that some analysis about *why* certain implementations behave certain ways would be useful.
+> When doing this, I will try to call out what is my opinion vs what is raw data.
+
+## Table of contents
+
+- [About the tests](#about-the-tests)
 - [Overview](#overview)
 - [Summary of findings](#summary-of-findings)
-- [Architecture Comparison](#architecture-comparison)
+   * [Improved since last time](#improved-since-last-time)
+- [Feature Coverage](#feature-coverage)
+- [Architecture](#architecture)
 - [Tests](#tests)
    * [Common Test Setup](#common-test-setup)
-   * [Attached Routes](#attached-routes)
-      + [Independently](#independently)
-      + [Simultaneously](#simultaneously)
+   * [Route Scale](#route-scale)
+      + [Small scale](#small-scale)
+      + [Large scale](#large-scale)
+      + [Traffic during changes](#traffic-during-changes)
       + [Findings](#findings)
-   * [Route propagation time](#route-propagation-time)
+   * [ListenerSet Scale](#listenerset-scale)
       + [Findings](#findings-1)
    * [Route Changes](#route-changes)
-   * [Route Scale](#route-scale)
-      + [Findings](#findings-2)
-   * [Traffic Performance](#traffic-performance)
-      + [Findings](#findings-3)
+      + [Route Propagation Delay](#route-propagation-delay)
+      + [Route Modification Stability](#route-modification-stability)
+      + [Deployment Changes](#deployment-changes)
+      + [Invalid Configuration](#invalid-configuration)
+      + [Attached Routes test](#attached-routes-test)
+   * [Traffic Test](#traffic-test)
+   * [Wrap up](#wrap-up)
 
 # Overview
 
 This test suite aims to cover any active, free, platform-agnostic (i.e. not a cloud vendor) implementation.
 
-|                                       | Cilium                    | Envoy Gateway           | Istio        | Kgateway                | Kong                 | Traefik                 | Nginx              |
-|---------------------------------------|---------------------------|-------------------------|--------------|-------------------------|----------------------|-------------------------|--------------------|
-| Open Source                           | ✅                         | ✅                       | ✅            | ✅                       | ❌ Since 3.10         | ✅                       | ✅                  |
-| Open Source Foundation                | CNCF                      | CNCF                    | CNCF         | CNCF                    | No foundation        | No foundation           | No foundation      |
-| Enterprise Vendors (offering support) | Single Vendor (Isovalent) | Single Vendor (Tetrate) | Many vendors | Single Vendor (solo.io) | Single Vendor (Kong) | Single Vendor (Traefik) | Single Vendor (F5) |
-| Dataplane Proxy                       | Envoy                     | Envoy                   | Envoy        | Envoy                   | Nginx                | Traefik                 | Nginx              |
-| Tested Version                        | v1.17.2                   | v1.4.0                  | v1.26.0      | v2.0.1                  | v3.9                 | v35.3.0                 | v1.6.2             |
+|                        | <img src="./imgs/icons/agentgateway.svg" height="32" alt=""><br>Agentgateway | <img src="./imgs/icons/envoy-gateway.svg" height="32" alt=""><br>Envoy Gateway | <img src="./imgs/icons/istio.svg" height="32" alt=""><br>Istio | <img src="./imgs/icons/kgateway.svg" height="32" alt=""><br>Kgateway | <img src="./imgs/icons/nginx.svg" height="32" alt=""><br>Nginx | <img src="./imgs/icons/traefik.svg" height="32" alt=""><br>Traefik |
+|------------------------|--------------|---------------|---------|----------|---------------|---------------|
+| Open Source            | ✅           | ✅            | ✅      | ✅       | ✅            | ✅            |
+| Open Source Foundation | AAIF         | CNCF          | CNCF    | CNCF     | No foundation | No foundation |
+| Dataplane Proxy        | Agentgateway | Envoy         | Envoy   | Envoy    | Nginx         | Traefik       |
+| Tested Version         | v1.7.0       | v1.9.3        | v1.31.3 | v2.5.0   | v2.8.0        | v3.7.16       |
+
 
 > [!TIP]  
 > All projects under test utilize a proxy that has usage beyond Kubernetes/Gateway API.
-> Its important to recognize that a high quality proxy does not, on its own, make a high quality Gateway API implementation.
+> It's important to recognize that a high quality proxy does not, on its own, make a high quality Gateway API implementation.
 > In the following tests, we will show even implementations that share the same proxy can have wildly different behaviors.
 
-The rationale for some notable exclusions:
-* HAProxy: no release in 3 years, does not support the current API.
-* APISIX: no release in 2 years, does not support the current API.
-* Tyk: transitioned to a closed source, paid model in 2024.
-* Linkerd: only supports mesh, not ingress use cases which this test focuses on.
-* Higress: no Gateway API support.
+This set of implementations is chosen based on the [implementations submitting conformance reports](https://gateway-api.sigs.k8s.io/docs/implementations/versions/v1.6/), excluding closed source offerings and those that have minimal usage, then pruning a few out to keep the test set small.
+(Note: at the time of writing this only excludes Cilium, which was primarily done because its deployment model makes it slightly complex to compare. See [`v1` report](./README-v1.md) for Cilium coverage!)
 
 # Summary of findings
 
 Because this report is long, I'll start with the summarized results.
 This section is entirely my subjective analysis of the results, so I would encourage you to draw your own conclusions!
 
-|                                             | Cilium                        | Envoy Gateway      | Istio | Kgateway | Kong                         | Traefik                      | Nginx                 |
-|---------------------------------------------|-------------------------------|--------------------|-------|----------|------------------------------|------------------------------|-----------------------|
-| [Attached Routes Test](#attached-routes)    | ✅                             | ⚠️ Errors with other broken implementations | ✅     | ✅        | ❌ Errors                     | ❌ Errors                     | ❌ Errors              |
-| [Route Probe Test](#route-propagation-time) | ✅                            | ❌ Errors           | ✅    | ✅       | ✅                           | ✅                           | ✅                    |
-| [Route Scale Test](#route-scale)            | ❌ Hard limit on scale         | ❌ Leaks memory     | ✅     | ✅        | ✅                            | ❌ Falls apart                | ✅                    |
-| [Traffic Performance](#traffic-performance) | ❌ Bottlenecked to single core | ✅                  | ✅     | ✅        | ⚠️ Degradation at high scale | ⚠️ Degradation at high scale | ❌ 20x worse than mean |
-| [Architecture](#architecture-comparison)    | ⚠️                            | ⚠️                 | ✅     | ✅        | ❌ Severe issues              | ❌ Severe issues              | ⚠️                    |
+|                        | <img src="./imgs/icons/agentgateway.svg" height="32" alt=""><br>Agentgateway | <img src="./imgs/icons/envoy-gateway.svg" height="32" alt=""><br>Envoy Gateway | <img src="./imgs/icons/istio.svg" height="32" alt=""><br>Istio | <img src="./imgs/icons/kgateway.svg" height="32" alt=""><br>Kgateway | <img src="./imgs/icons/nginx.svg" height="32" alt=""><br>Nginx | <img src="./imgs/icons/traefik.svg" height="32" alt=""><br>Traefik |
+|------------------------------------------------------------|--------------|-------------------------------|-------------------------------|-------------------------------|-------------------------------------|--------------------------------------|
+| [Architecture](#architecture)                              | ✅           | ✅                            | ✅                            | ✅                            | ✅                                  | ❌ Gateways are not isolated         |
+| [Route Scale](#route-scale) (est. yearly cost)             | $280         | $8,456 (30x)                  | $5,500 (20x)                  | $8,283 (30x)                  | ❌ $51,006 (182x), deadlocks        | $18,228 (65x)                        |
+| [ListenerSet Scale](#listenerset-scale) (est. yearly cost) | $1,034       | $30,443 (29x)                 | $11,276 (11x)                 | $15,562 (15x)                 | $131,930 (128x)                     | ❌ Unsupported                       |
+| [Route Propagation](#route-propagation-delay)              | ✅           | ✅                            | ✅                            | ✅                            | ✅                                  | ⚠️ 2s floor                          |
+| [Route Modification](#route-modification-stability)        | ✅           | ❌ Errors during changes      | ✅                            | ✅                            | ❌ Errors during changes            | ✅                                   |
+| [Deployment Changes](#deployment-changes)                  | ✅           | ✅                            | ✅                            | ✅                            | ❌ Errors during gateway rollout    | ❌ Errors during gateway rollout     |
+| [Invalid Configuration](#invalid-configuration)            | ✅           | ❌ Blocks valid configuration | ❌ Blocks valid configuration | ❌ Blocks valid configuration | ✅                                  | ✅                                   |
+| [Traffic](#traffic-test)                                   | ✅           | ✅                            | ✅                            | ✅                            | ❌ Poor throughput, port exhaustion | ⚠️ Doesn't scale to high concurrency |
 
-Traefik:
-* 🚨🚨🚨 Traefik consolidates all Gateways, even in different namespaces, onto a single shared component.
-  This merging is not only risk from a security and operational standpoint, but it is implemented in a manner such that any namespace can modify or collide with another namespaces configuration (in violation of the specification). ([source](#architecture-comparison))
-* 🚨🚨🚨 When a new Traefik instance starts, it starts recieving traffic before it has applied its configuration.
-  The time to apply configuration can be extremely large (see below). ([source](#route-scale))
-* 🚨🚨 Traefik cannot handle large scales of routes, and completely fails to apply them. ([source](#route-scale))
-* ⚠️ Traefik occasionally reported incorrect status messages which never recovered. ([source](#attached-routes))
-* ⚠️ If a route points to Traefik and another Gateway, Traefik will attempt to infinitely remove the other's status. ([source](#attached-routes))
-* ⚠️ While Traefik has competitive traffic performance at small scales, it is unable to scale up to serve as much traffic as other implementations. ([source](#traffic-performance))
-
-Nginx:
-* 🚨 Nginx may crash while processing valid HTTPRoutes. ([source](#route-changes))
-* 🚨 Nginx throughput is 20x worse than the median implementation. ([source](#traffic-performance))
-* ⚠️ Nginx does not have a separation of control plane and data plane which can be a reliability risk at high scale.
-* ⚠️ Nginx only supports a single Gateway instance.
-* ⚠️ If a route points to Nginx and another Gateway, Nginx will attempt to infinitely remove the other's status. ([source](#attached-routes))
-* ⚠️ Nginx uses substantial CPU resources to process Gateways/Routes that are not targeted at Nginx.
-
-Cilium:
-* 🚨 After the generated Envoy configuration reaches 1.5mb (etcd limits), the proxy configuration is unable to be updated. Configurations cannot be added, removed, or updated. This happens silently without any feedback to the user. ([source](#route-propagation-time))
-* 🚨 During route updates, there is a temporary downtime. ([source](#route-changes))
-* 🚨 Cilium throughput is unable to scale up with multiple connections, leading to up to 20x worse performance than the median implementation in some cases. ([source](#traffic-performance))
-* 🚨 Cilium repeatedly got into states where all traffic to a node was dropped, recovering only by restarting Envoy. ([source](#traffic-performance))
-* ⚠️ At large scales, Cilium control plane uses excessive CPU (over 15x the top performing implementation). ([source](#route-scale))
-* ⚠️ Cilium uses a single shared Envoy instance (per node) for all Gateways in the cluster. This represents a risk of noisy neighbor issues and confused deputy attacks when operating in a multi-tenant environment. ([source](#architecture-comparison))
-* ℹ️ At large scales, Cilium data plane generates excessive timeseries entries (by default) that may degrade performance. ([source](#route-scale))
+Agentgateway:
+* ✅ No issues were found.
+* ✅ Lowest resource consumption across tests, at an estimated 11x-182x reduction in cost compared to others. ([source](#route-scale))
 
 Envoy Gateway:
-* 🚨 During route updates, there is a temporary downtime for traffic. ([source](#route-changes))
-* 🚨 During changes to routes, Envoy Gateway's control plane leaks memory. ([source](#route-scale))
-* ⚠️ At large scales, Envoy Gateway control plane uses excessive CPU (15x the top performing implementation). ([source](#route-scale))
-* ⚠️ When a new route is added, initial requests to the route will get errors. ([source](#route-propagation-time))
-* ⚠️ Envoy Gateway deploys all resources, even from other namespaces, into a single shared namespace. This represents an operational and security risk, and violates the upstream specification. ([source](#architecture-comparison))
-* ℹ️ At large scales, Envoy Gateway data plane generates excessive timeseries entries (by default) that may degrade performance. ([source](#route-scale))
-
-Kong:
-* 🚨🚨🚨 Kong consolidates all Gateways, even in different namespaces, onto a single shared component.
-  This merging is not only risk from a security and operational standpoint, but it is implemented in a manner such that any namespace can modify or collide with another namespaces configuration (in violation of the specification). ([source](#architecture-comparison))
-* ⚠️ Kong occasionally reported incorrect status messages which never recovered. ([source](#attached-routes))
-* ⚠️ If a route points to Kong and another Gateway, Kong will attempt to infinitely remove the other's status. ([source](#attached-routes))
-* ⚠️ While Kong has competitive traffic performance at small scales, it is unable to scale up to serve as much traffic as other implementations. ([source](#traffic-performance))
-* ⚠️ Kong uses non-trivial CPU resources to process Gateways/Routes that are not targeted at Nginx.
+* 🚨 A single invalid route blocks all subsequent configuration updates, while reporting the route as accepted. ([source](#invalid-configuration))
+* 🚨 During route updates, there is a temporary downtime for traffic. ([source](#route-modification-stability))
+* ⚠️ Envoy `cluster`s are created per route rather than per service, which drives up data plane memory when many routes share a Service. ([source](#envoy-memory-usage-1))
+* ⚠️ With ongoing churn of routes and pods, the control plane uses over 1 vCPU. ([source](#large-scale))
+* ℹ️ The data plane generates a high number of metrics time series by default. ([source](#high-cardinality-metrics))
 
 Istio:
-* ✅ No issues were found.
+* 🚨 A single invalid route blocks all subsequent configuration updates, while reporting the route as accepted. ([source](#invalid-configuration))
+* ⚠️ Envoy `cluster`s are created for every Service port, including unused ones, roughly doubling data plane memory relative to Envoy Gateway in the route scale test. ([source](#envoy-memory-usage))
+* ℹ️ Configuration updates are batched for up to 10s, trading propagation latency for lower network usage. ([source](#findings-2))
 
 Kgateway:
-* ℹ️ At large scales, Kgateway data plane generates excessive timeseries entries (by default) that may degrade performance. ([source](#route-scale))
+* 🚨 A single invalid route blocks all subsequent configuration updates, while reporting the route as accepted. ([source](#invalid-configuration))
+* ⚠️ Envoy `cluster`s are created for every Service port, including unused ones, roughly doubling data plane memory relative to Envoy Gateway in the route scale test. ([source](#envoy-memory-usage))
+* ℹ️ The data plane generates a high number of metrics time series by default. ([source](#high-cardinality-metrics))
 
+Nginx:
+* 🚨 The controller deadlocks during configuration updates, permanently blocking all further changes until it is restarted. ([source](#nginx-deadlocks-during-configuration-update))
+* 🚨 During route updates and gateway rollouts, there is a temporary downtime for traffic. ([source](#route-modification-stability))
+* 🚨 Throughput is a fraction of other implementations, and sustained load fails requests due to ephemeral port exhaustion, as upstream connections are not reused by default. ([source](#traffic-test))
+* ⚠️ Highest resource consumption, at an estimated 182x the cost of the most efficient implementation. ([source](#route-scale))
+* ⚠️ Long-lived connections during configuration changes dramatically increase memory usage. ([source](#traffic-during-changes))
+* ⚠️ Adding or removing a port causes all data plane pods to restart. ([source](#nginx-pod-churn))
 
-# Architecture Comparison
+Traefik:
+* 🚨 All Gateways share a single Traefik instance and routing table, so a route in one namespace can take over traffic for another namespace's Gateway. This breaks the isolation that Traefik's own documentation recommends Gateway API for. ([source](#architecture))
+* 🚨 During gateway rollouts, there is a temporary downtime for traffic. ([source](#deployment-changes))
+* ⚠️ `ListenerSet` is not supported. ([source](#listenerset-scale))
+* ⚠️ With ongoing churn of routes and pods, the control plane uses over 1 vCPU. ([source](#large-scale))
+* ⚠️ Route propagation has a floor of 2s. ([source](#route-propagation-delay))
+* ⚠️ Throughput does not scale to high connection counts as well as other implementations. ([source](#traffic-test))
 
-The architecture of the project is critical to its success in a real world environment. There are a variety of distinct architectures used by the implementations under tests.
+## Improved since last time
 
-The optimal architecture has a few aspects:
-* The control plane (which reads configuration and programs the underlying proxy) is split from the data plane. This is a [widely established best practice](https://docs.aws.amazon.com/whitepapers/latest/aws-fault-isolation-boundaries/control-planes-and-data-planes.html) to optimize for reliability and scale.
-* The data plane must run in the same namespace as the `Gateway` object. This avoids privilege violations where a lower privilege namespace can create resources in privileged namespaces. Additionally, this ensures the ability to distinguish traffic from different `Gateway` instances (for usages such as `NetworkPolicy` and others).
+Most of these tests also ran in the [`v1`](./README-v1.md#summary-of-findings) or [`v2`](./README-v2.md#summary-of-findings) report.
+The table compares each result to the most recent previous report that tested that implementation.
+Empty cells were good before and are still good; `-` means there is no previous result.
 
-These properties are *almost required* by the specification by [GEP 1762](https://gateway-api.sigs.k8s.io/geps/gep-1762), though Cilium has a unique architecture that meets the requirements as well (see below)
+|                        | <img src="./imgs/icons/agentgateway.svg" height="32" alt=""><br>Agentgateway | <img src="./imgs/icons/envoy-gateway.svg" height="32" alt=""><br>Envoy Gateway | <img src="./imgs/icons/istio.svg" height="32" alt=""><br>Istio | <img src="./imgs/icons/kgateway.svg" height="32" alt=""><br>Kgateway | <img src="./imgs/icons/nginx.svg" height="32" alt=""><br>Nginx | <img src="./imgs/icons/traefik.svg" height="32" alt=""><br>Traefik |
+|-----------------------------------------------------|--------------|-----------------------------------------------------------|-------|----------|----------------------------------------|-----------------------------------------------|
+| [Architecture](#architecture)                       |              | ⚠️ → ✅ (previously wrote resources into wrong namespace) |       |          | ⚠️ → ✅ (previously shared controller) | ❌ (false isolation)                          |
+| [Route Scale](#route-scale)                         |              | ❌ → ✅ (previously leaked memory)                        |       |          | ❌ (deadlocks)                         | ❌ → ✅️ (previously failed to program)        |
+| [ListenerSet Scale](#listenerset-scale)             |              | -                                                         |       | -        | -                                      | ⚠️ (unsupported)                              |
+| [Route Propagation](#route-propagation-delay)       |              | ❌ → ✅ (previously gave 5xx errors)                      |       |          | ❌ → ✅ (previously failed at scale)   |                                               |
+| [Route Modification](#route-modification-stability) |              | ❌ (still gives 5xx errors)                               |       |          | ❌ (still gives 5xx errors)            |                                               |
+| [Traffic](#traffic-test)                            |              |                                                           |       |          | ❌ (poor throughput)                   | ⚠️ (does not scale to high connection counts) |
 
-This architecture typically looks like this:
+[Deployment Changes](#deployment-changes) and [Invalid Configuration](#invalid-configuration) are new tests in this report.
 
-<img src="./imgs/ideal-architecture.png" title="Ideal architecture" style="width: 500px;">
+Resource consumption also appears to be down quite a bit across the board, but the numbers are hard to compare apples to apples across runs.
 
-This approach is implemented in Istio and Kgateway.
----
+Kudos to all the implementations that have improved over the last year!
 
-A few implementations take different approaches.
-The first variation is deploying the gateway instances in a shared namespace.
-This violates namespace boundaries and introduces security risks: any namespace (with `Gateway` creation privilege) can spin up a service and deployment in the system namespace, and send arbitrary traffic from this namespace.
+# Feature Coverage
 
-As noted above, this violates the specification which states:
-> an implementation MUST provision generated resources in the same namespace as the Gateway if they are namespace scoped resources.
+While Gateway API comes with a set of conformance tests, unlike Kubernetes itself, the majority of the tests are _optional_.
+Instead, each implementation specifies _which parts_ of the API they implement, and conformance just verifies that subset.
 
-This approach is taken by Envoy Gateway.
+Below shows the coverage of features in v1.6:
 
-<img src="./imgs/cross-ns-architecture.png" title="Cross namespace architecture" style="width: 500px;">
+![](./imgs/v3-feature-coverage.png "Feature coverage")
 
----
+**Agentgateway** (0 missing)
 
-Finally, there are architectures that are entirely shared - no matter how many `Gateway` resources there are, they are all served by a single shared proxy deployment.
+**Envoy Gateway** (1 missing):
+- Gateway HTTPS Listener Detect Misdirected Requests
 
-This has some variations in each implementation:
+**Istio** (2 missing):
+- Gateway Backend Client Certificate
+- Gateway HTTPS Listener Detect Misdirected Requests
 
-* Traefik and Nginx have a single Deployment and Service for all Gateway instances, and the control plane is embedded in this deployment as well.
-  * Traefik does not properly isolate these, in violation of the specification.
-    Two distinct Gateways in different namespaces can collide with each other and effect routing.
-    **This makes Traefik unsafe for usage with multiple Gateways**.
-    Additionally, Traefik does not support dynamic ports.
-  * Nginx does not support multiple Gateways at all and will reject any after the first.
-* Kong has the control plane split out, but uses a single Deployment and Service for all Gateway instances.
-  Like Traefik, these are not properly isolated in violation of the spec. **This makes Kong unsafe for usage with multiple Gateways**.
-* Cilium deploys a Service-per-Gateway, in the Gateway namespace, but serves traffic from a single proxy DaemonSet. Cilium has 3 components: A per-node Envoy DaemonSet (data plane), a per-cluster Operator Deployment (control plane), and a per-node Cilium Agent DaemonSet (this blurs the line between control plane and data plane; for our purposes we categorize it as data plane). Because the only generated resources live in the Gateway namespace, and Cilium's unique architecture allows multiple Services from distinct namespaces to all be sent to the same data plane instance, this meets the requirements of the API. However, overloading all Gateways cluster-wide into a single data plane deployment does introduce risks.
+**Kgateway** (1 missing):
+- Gateway HTTPS Listener Detect Misdirected Requests
 
-Below shows an example of a shared architecture with a split controller; some have only a single Deployment.
+**Nginx** (8 missing):
+- Backend TLS Policy SAN Validation
+- HTTPRoute Backend Request Header Modification
+- HTTPRoute Backend Timeout
+- HTTPRoute Named Route Rule
+- HTTPRoute Request Timeout
+- HTTPRoute Retry
+- HTTPRoute Retry Backend Timeout
+- HTTPRoute Retry Connection Error
 
-<img src="./imgs/shared-architecture.png" title="Shared architecture" style="width: 500px;">
+**Traefik** (19 missing):
+- Backend TLS Policy SAN Validation
+- Gateway Address Empty
+- Gateway Backend Client Certificate
+- Gateway Frontend Client Certificate Validation
+- Gateway Frontend Client Certificate Validation Insecure Fallback
+- Gateway HTTP Listener Isolation
+- Gateway HTTPS Listener Detect Misdirected Requests
+- Gateway Infrastructure Propagation
+- Gateway Static Addresses
+- HTTPRoute Backend Timeout
+- HTTPRoute CORS
+- HTTPRoute Request Mirror
+- HTTPRoute Request Multiple Mirrors
+- HTTPRoute Request Percentage Mirror
+- HTTPRoute Request Timeout
+- HTTPRoute Retry
+- HTTPRoute Retry Backend Timeout
+- HTTPRoute Retry Connection Error
+- Listener Set
 
----
+The remainder of the report will be focused on custom tests developed in this repository.
 
-In summary:
+# Architecture
 
-|                                | Cilium          | Envoy Gateway                 | Istio | Kgateway | Kong               | Traefik            | Nginx                  |
-|--------------------------------|-----------------|-------------------------------|-------|----------|--------------------|--------------------|------------------------|
-| Dataplane/Controlplane Split   | ⚠️ <sup>1</sup> | ✅                             | ✅     | ✅        | ✅                  | ❌                  | ❌ <sup>2</sup> |
-| Gateway instances split        | ❌ <sup>4</sup> | ✅                             | ✅     | ✅        | ❌                  | ❌                  | ❌                      |
-| Dataplane in Gateway namespace | ❌               | ❌                             | ✅     | ✅        | ❌                  | ❌                  | ❌                      |
-| GatewayClass pre-created       | ✅               | ❌                             | ✅     | ✅        | ❌                  | ✅                  | ✅                      |
-| Spec compliant architecture    | ✅               | ❌ Namespace boundaries broken <sup>3</sup> | ✅     | ✅        | ❌ Major violations | ❌ Major violations | ⚠️ Single Gateway only |
+Below provides a high level overview of the architectures of each project. With one exception, none of these is "correct/incorrect".
 
-<sup>1</sup>: `cilium-agent` is a control plane component but is involved in serving traffic.
+|                                   | Agentgateway       | Envoy Gateway                               | Istio                  | Kgateway | Nginx                                     | Traefik                   |
+|-----------------------------------|--------------------|---------------------------------------------|------------------------|----------|-------------------------------------------|---------------------------|
+| Proxy                             | Agentgateway       | Envoy                                       | Envoy                  | Envoy    | Nginx                                     | Traefik                   |
+| Proxy language                    | Rust               | C++                                         | C++                    | C++      | C                                         | Go                        |
+| Controller language               | Go                 | Go                                          | Go                     | Go       | Go                                        | Go                        |
+| Controller and proxy developed in | Same repo          | Same org                                    | Neither                | Neither  | Same org                                  | Same repo                 |
+| Control plane / data plane split  | ✅                 | ✅                                          | ✅                     | ✅       | ✅                                        | ❌ Single binary          |
+| Deployment per Gateway            | ✅                 | ✅ (in Gateway namespace is opt-in)         | ✅                     | ✅       | ✅                                        | ❌ Shared by all Gateways |
+| Config delivery                   | xDS (custom types) | xDS                                         | xDS                    | xDS      | Agent writes files + reload               | In-process                |
 
-<sup>2</sup>: The [NGINX Gateway Fabric 2.0](https://community.f5.com/kb/technicalarticles/announcing-f5-nginx-gateway-fabric-2-0-0-with-a-new-distributed-architecture/341657) release was shipped around the time of publishing this, splitting the control and data plane.
-However, this comparison is still using version 1.6. A followup will test version 2.0.
+The terms "Control plane" and "Data plane" are worth defining for those not familiar.
+The 'Control plane' or controller is the process watching the cluster and programming the proxy or 'data plane'.
+All implementations except Traefik have a split control/data plane architecture; Traefik has both embedded into one Deployment/container.
 
-<sup>3</sup>: Envoy Gateway recently released a [Namespace Mode](https://gateway.envoyproxy.io/docs/tasks/operations/gateway-namespace-mode/) that can deploy the resources in the correct namespace, which may fix this issue.
-This feature was not evaluated as it was released after the comparison was done, is off-by-default, and is "alpha". A followup comparison will evaluate this mode.
+| Split                                                           | Joined                                                                |
+|-----------------------------------------------------------------|-----------------------------------------------------------------------|
+| ![Split control plane and data plane](./imgs/v3-arch-split.png) | ![Joined control plane and data plane](./imgs/v3-arch-monolithic.png) |
 
-<sup>4</sup>: The Cilium community [does not agree](https://github.com/cilium/cilium/issues/39974#issuecomment-3555661850) with the assessment that a shared data plane is a risk. I encourage you to draw your own conclusions (ideally, based on your own testing!).
+While it is valid to have a joined architecture (as seen in [`v1` report](./README-v1.md), Cilium) and correctly implement Gateway API, this is not the case for Traefik.
+I set up [a test](./tests/traefik-tenancy.yaml) that sets up two Gateways with their own independent routes, in different namespaces:
+
+![](./imgs/v3-traefik-tenancy.png "Traefik tenancy test")
+
+With this setup Traefik mixes the two routes across namespace A and namespace B.
+All other implementations (and the Gateway API spec) treat Gateways as independent entities with their own set of configurations, IP addresses, etc.
+Traefik [recommends Gateway API](https://doc.traefik.io/traefik/security/multi-tenant-kubernetes/#gateway-api) for its multi-tenancy guarantees, but its implementation doesn't actually offer these guarantees.
 
 # Tests
-
-We will run a variety of distinct scenarios against each implementation.
-
-A single HTTPRoute may be attached to many Gateway's simultaneously.
-This is often utilized to run tests concurrently to all implementations.
-However, some implementations do not support this (in violation of the specification) so are excluded from these tests.
-When excluded, they will be called out in the test section.
 
 ## Common Test Setup
 
 The test environment deploys a Grafana, Prometheus, and VictoriaLogs instance for monitoring.
 Then, each implementation is deployed along with a `Gateway` for it.
 
-This can all be setup by running `./install/basic.sh`.
+This can all be set up by running `./install/basic.sh`.
 
 The results on this post are run using a single node `kind` cluster on a 16-core AMD 9950x CPU with 96GB RAM.
 Note that while this type of environment may be unrealistic for *traffic tests* (such as max QPS and latency), which are
 typically much more appropriate to run in similar hardware to real world usage, most tests here are not sensitive to variations in hardware.
 Using a single node cluster helps minimize noise (from implementations getting different results based on which others are co-scheduled, for example).
-Additionally, Cilium deploys some components as DaemonSets, so a single node helps normalize those to a single instance.
 
 The recommended installation steps:
 
 ```shell
-# Must be done BEFORE Cilium install
-kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.3.0/standard-install.yaml
-cilium install -f cilium.yaml
 ./install/basic.sh
 ```
 
-The [Grafana dashboard](dashboard.json) can be imported for visualizing the test results.
-
-## Attached Routes
-
-The `Gateway` object has an interesting `status` message, `attachedRoutes` which is supposed to store a count of the total successfully attached route objects.
-
-In this test, we create a bunch of routes and investigate how this status field is updated.
-
-This test is interesting not so much because `attachedRoutes` is critical for day to day operations, but that it gives a lot of insight into how the controller is implemented.
-
-To reproduce this test, run `./tests/attached-routes.sh [split|joined] --routes=1000`.
-This can run all implementations concurrently (`joined`) or separately (`split`). 
-
-### Independently
-
-First, we will run the test for each implementation one-by-one.
-
-The *Setup time* is the time *after the last route is created* until the `attachedRoutes` is updated to the total route count.
-In this test, I created 1000 routes.
-
-Once the setup is complete, all routes are removed and we wait for the count to go back to 0.
-
-The *Teardown time* is the time after the last route is deleted until the status is reset back to zero.
-
-*Total writes* indicates how many distinct times the status field was updated. This shows how some implementations make many updates, while others batch them up.
-
-|                                | Cilium | Envoy Gateway | Istio | Kgateway | Kong | Traefik | Nginx |
-| ------------------------------ | ------ | ------------- | ----- | -------- | ---- | ------- | ----- |
-| Setup time                     | 1s     | 23s           | 2s    | 12s      | 1s   | 180s    | 29s   |
-| Teardown time                  | 18s    | 45s           | 20s   | 16s      | 22s  | 16s     | 15s   |
-| Total Writes                   | 193    | 1383          | 311   | 323      | 1403 | 73      | 82    |
-
-![](./imgs/attached-routes.png "Attached Routes test result")
-
-> [!CAUTION]
-> **Kong** and **Traefik** both reported incorrect results. Both reported more routes than there were, and occasionally got into scenarios where the `attachedRoute` field was was non-zero when there were no routes.
-
-### Simultaneously
-
-This test is the same as before, but instead of creating 1000 routes with 1 gateway reference each, we create 1000 routes with a gateway references to each implementation.
-
-
-|                                | Cilium | Envoy Gateway | Istio | Kgateway | Nginx |
-| ------------------------------ | ------ | ------------- | ----- | -------- | ----- |
-| Setup time                     | 1s     | 10s           | 2s    | 17s      | 17s   |
-| Teardown time                  | 27s    | 45s           | 27s   | 28s      | 28s   |
-| Total Writes                   | 243    | 1484          | 73    | 15       | 128   |
-
-![](./imgs/attached-routes-sim.png "Attached Routes Simultaneously test result")
-
-This test revealed a number of implementation issues with the interaction between implementations.
-
-**Nginx** was found to behave improperly.
-Below shows the audit log showing Nginx duplicating status entries; there should be 1 entry per controller, but Nginx writes duplicates.
-```json
-{
-  "user": "system:serviceaccount:istio-system:istiod",
-  "gw": [
-    "gateway.nginx.org/nginx-gateway-controller",
-    "kgateway.dev/kgateway",
-    "istio.io/gateway-controller",
-    "gateway.envoyproxy.io/gatewayclass-controller"
-  ]
-}
-{
-  "user": "system:serviceaccount:nginx-system:nginx-nginx-gateway-fabric",
-  "gw": [
-    "gateway.nginx.org/nginx-gateway-controller",
-    "gateway.envoyproxy.io/gatewayclass-controller",
-    "istio.io/gateway-controller",
-    "kgateway.dev/kgateway",
-    "kgateway.dev/kgateway",
-    "istio.io/gateway-controller",
-    "gateway.envoyproxy.io/gatewayclass-controller"
-  ]
-}
-```
-
-**Traefik** was found to behave improperly.
-Each controller should write a status message for their own reference.
-Instead, Traefik writes one for each parent -- even parents pointing to other Gateways.
-This additionally poorly interacts with **Envoy Gateway**.
-When Envoy Gateway sees a status entry for it's parent from Traefik, it takes it over.
-As a result, we have the following sequence:
-```json
-{
-  "user": "system:serviceaccount:envoy-gateway-system:envoy-gateway",
-  "gw": [
-    "gateway.envoyproxy.io/gatewayclass-controller"
-  ]
-}
-{
-  "user": "system:serviceaccount:traefik-system:traefik",
-  "gw": [
-    "traefik.io/gateway-controller",
-    "traefik.io/gateway-controller",
-    "gateway.envoyproxy.io/gatewayclass-controller"
-  ]
-}
-{
-  "user": "system:serviceaccount:envoy-gateway-system:envoy-gateway",
-  "gw": [
-    "traefik.io/gateway-controller",
-    "gateway.envoyproxy.io/gatewayclass-controller",
-    "gateway.envoyproxy.io/gatewayclass-controller"
-  ]
-}
-{
-  "user": "system:serviceaccount:traefik-system:traefik",
-  "gw": [
-    "traefik.io/gateway-controller",
-    "traefik.io/gateway-controller",
-    "gateway.envoyproxy.io/gatewayclass-controller",
-    "gateway.envoyproxy.io/gatewayclass-controller"
-  ]
-}
-```
-First, Traefik writes a duplicate status entry.
-Then, Envoy Gateway takes over the duplicate entry.
-This causes Traefik to create another duplicate, which Envoy Gateway will also take over.
-This occurs indefinitely, and eventually the object will have thousands of invalid status entries.
-
-These results were found from the Kubernetes Audit log, processed with command: `jq 'select(.verb != "list") | select(.responseObject.code != 409) | {time: .requestReceivedTimestamp, verb: .verb, user: .user.username, gw: [.responseObject.status.parents?[]?.controllerName]}'`
-
-
-### Findings
-
-* Traefik and Kong have bugs in their implementations that can lead to them reporting invalid status.
-* Nginx, Traefik, and Envoy Gateway all have poor interactions with other implementations leading to invalid status messages.
-* Traefik stands out as by far the slowest implementation.
-* Cilium, Istio, and Kong show the fastest update times (each roughly the same).
-* Kgateway, Envoy Gateway, and Nginx (in that order) trail behind a bit, but have pretty reasonable results.
-* While all implementations have a spike in CPU during their turn, Nginx consistently spikes in CPU when *unrelated controllers* are running. This indicates it is unable to ignore (from a performance perspective) configurations that are not intended for it. Kong shows similar behavior but to a lesser extent.
-* In terms of *number* of writes, we see a few differences. Envoy Gateway and Kong tend to write a lot, while the others write less frequently (differing slightly depending on the scenario). There is no true "best" value here; writing too often may lead to excessive costs, while not writing enough may lead to low responsiveness.
-  However, this is not necessarily directly correlated. While Kong writes a lot, it also has very fast response times. In contrast, Envoy Gateway writes a lot but is on the slower side.
-* Looking at the graphs also gives some interesting insights.
-  * Envoy Gateway speeds up at the end of setup, and slows down at the end of teardown. I would **guess** this has to do with favoring updates to the HTTPRoutes themselves during the slow times.
-  * In contrast, Kgateway tends to initially write fast then slow down towards the end of setup (tear down, however, remains fast).
-
-## Route propagation time
-
-In this test, we apply a route and wait for it to be ready in the data plane.
-This is done by sending requests to it until it transitions from returning `404` to `200`.
-
-The test runs 3000 routes. A new route is added after the previous route is completed, and the time until a request successfully returns 200 is recorded.
-
-To reproduce this test, run `./tests/probe.sh [split|joined] --routes=3000`.
-This can run all implementations concurrently (`joined`) or separately (`split`).
-
-First we plot the results:
-
-![](./imgs/probe-test.png "Probe test result")
-
-Additionally, the CPU and memory utilization is tracked during the test:
-
-![](./imgs/probe-test-util.png "Probe test resource utilization result")
-
-Finally, the total latency and number of errors is tracked. An error is any status code other than a 404 or 200 that is returned. A new route is expected to transition from 404 to 200 without any errors.
-
-![](./imgs/probe-graph.png "Probe test results")
-
-Due to Kong and Traefik being slow, they were excluded from above and run individually. Both show similar results of a fairly static, but high, latency. 
-
-![](./imgs/probe-traefik.png "Traefik test result")
-
-![](./imgs/probe-kong.png "Kong test result")
-
-### Findings
-
-Looking at the control plane and data plane resource utilization during the test gives some additional insights:
-* Nginx and Envoy Gateway data planes both scale up memory usage as more routes are added. (Note: nginx control and data plane are co-located so cannot be viewed independently).
-* All control planes scale up memory usage as more routes are added.
-* CPU usage for both data plane and control plane remains mostly flat for all implementations, with Envoy Gateway data plane increasing slightly as more routes are added.
-  * Cilium uses by far the most CPU, followed by Nginx and Envoy Gateway, then Kgateway and Istio which are about the same. Cilium's control plane use 7.5x the CPU of Istio, and Envoy Gateway uses 2.9x.
-* Both Kong and Traefik have very consistently (slow) times, at 3s and 2s respectively.
-
-While Cilium behaves reasonably at lower route scales, it has complete failure once the route size gets too large.
-After a certain threshold of total size of Envoy configuration is passed, Cilium is unable to update the proxy **at all**.
-This includes adding new routes, but also changing existing configuration.
-When this happens, there is no feedback to the user; routes are reported as "ready" in the status even when they will never become ready.
-
-Both Cilium and Envoy Gateway encounter errors during the test, while all others complete with zero errors.
-Cilium's errors, however, only occur during the very first route creation, likely indicating the Gateway is not fully setup until the first route attaches.
-In practice, this is unlikely to have any production impact.
-Envoy Gateway's, however, occur throughout the test, giving errors on nearly every single route, total to 15,000 failed requests through the test.
-
-## Route Changes
-
-In this test, traffic is continually sent to a gateway while a route is modified.
-This one has no pretty graphs -- an implementation passes if they return 100% `200`s and fails if they return any errors.
-
-To reproduce this test, run `./tests/routechange.sh --iterations=20`.
-
-3 of 7 implementations fail to safely update a route with zero downtime:
-
-| Gateway       | Result | Reason                       |
-| ------------- | ------ | ---------------------------- |
-| Kgateway      | ✅     |                              |
-| Istio         | ✅     |                              |
-| Traefik       | ✅     |                              |
-| Kong          | ✅     |                              |
-| Nginx         | ❌     | Crashloop during changes     |
-| Envoy Gateway | ❌     | 503s and 500s during changes |
-| Cilium        | ❌     | 503s during changes          |
-
-This can be a fatal error in production.
-While the [route propagation test](#route-propagation-time) measures *new routes*, which may not be as critical, changing a route is a routine operation during progressive rollouts and other operations.
-Downtime caused by a gateway implementation during a rollout will directly impact users, as these routes may be serving live traffic already.
+The [Grafana dashboard](./dashboard.json) can be imported for visualizing the test results.
 
 ## Route Scale
 
-In this test, a large number of routes, services, and pods are created.
+First up, we start with a simple test: create a large number of routes, services, and pods.
 Once the initial set of resources is created, a resource is modified (such as editing an HTTPRoute, or adding/removing a Pod).
 The resource utilization of the gateway control and data planes is recorded.
-Note that tests up until now have been creating large number of HTTPRoutes, but all pointing to a single backend; this test has many backends.
 
 To reproduce this test, run `./tests/route-load.sh <namespace count> <routes per namespace>`.
 
-To simulate a large cluster, we run with 50 namespaces with 100 routes each (5,000 routes total):
+We will simulate a small cluster and a large cluster, with 10 namespaces with 10 routes each (100 total), and 50x100 (5,000 routes total).
 
-![](./imgs/route-scale-50-100.png "Route scale test, 50 namespaces with 100 routes")
+### Small scale
 
-During my testing, I was surprised to find Envoy Gateway and kgateway *data planes* using so much CPU.
-After some investigation, I found this was caused by the high number of metrics emitted by these proxies, along with an aggressive 5s scraping interval used in the test.
+![](./imgs/v3-route-scale-10-10.png "Route scale test, 10 namespaces with 10 routes")
 
-|Dataplane|Timeseries Created|
-|-|-|
-|Istio|557|
-|Cilium|341,778|
-|Envoy Gateway|852,418|
-|Kgateway|1,710,982|
+At small scale, we don't see too much interesting. While there is a spread of resource consumption, overall consumption is pretty low
+as would be expected at a small scale.
 
-(While Cilium also generates a relatively high number of metrics, the test Prometheus instance wasn't configured to scrape it).
+One major standout is Nginx's CPU usage, which is at nearly 0.5 CPU to handle 100 routes.
+While still not **that** much, it is 370x the most efficient implementation (Agentgateway) and 30x the Envoy-based implementations (which all came in around the same).
 
-To isolate the metrics load from the rest of the test, I reran the test with Prometheus scraping disabled for each Gateway.
-Additionally, I took the opportunity to `sum` the two Cilium components, and hide Nginx from the data plane section (it's mixed control plane and data plane architecture skews the results).
+### Large scale
 
-![](./imgs/route-scale-50-100-noprom.png "Route scale test, 50 namespaces with 100 routes and no Prometheus")
+Scaling up to 5,000 routes things start to diverge more.
 
-In the test above, Envoy Gateway appears to leak, but its hard to say conclusively without running a longer test.
-A 30 minute execution reveals unbounded memory leaks; even after the test was stopped (the vertical blue line), the memory is not freed.
+![](./imgs/v3-route-scale-50-100.png "Route scale test, 50 namespaces with 100 routes")
 
-![](./imgs/route-scale-envoy-leak.png "Envoy Gateway memory leak")
+**Data plane memory** shows a substantial divergence and can be a substantial factor in costs in real world (have you seen the price of RAM these days??), as there are often many replicas.
+Istio, Kgateway, and Nginx all use around ~1.6GB. The smallest footprint was Agentgateway, at 1/40th the footprint (40MB).
+Envoy Gateway and Traefik fell in the middle at 900MB and 400MB respectively.
 
-Initial testing of Traefik (standalone, due to bugs with co-existing with other implementations) initially appears to be one of the best performing control planes:
+**Data plane CPU** continues to see Nginx using substantially more than other implementations, with the Envoy based implementations in the 0.1-0.3 vCPU range (more on the spread below), and Agentgateway at near-zero.
+Traefik is hard to analyze due to its [architecture](#architecture).
 
-![](./imgs/route-scale-traefik.png "Traefik control plane performance -- too good to be true")
+**Control plane CPU** shows most implementations spiking during the initial phase (applying lots of config quickly) and then reaching a steady state (modifying a config/pod every so often), with Envoy Gateway and Kgateway seeing substantially larger spikes.
+However, the steady state is generally the more important area (unless you are constantly creating 5,000 routes at once?), and where there is more divergence.
+Envoy Gateway and Traefik both use over 1 vCPU, with the others quite a bit lower (Nginx 0.36, Kgateway 0.25, Istio 0.08, Agentgateway 0.008).
 
-However, this turned out to be too good to be true.
-Traefik appears to be highly performant because its **not actually processing the routes at all**!
-Traefik consistently only processed a subset of the routes -- as few as 10% -- leaving the rest entirely ignored. This was verified through Traefik's internal API (`/api/http/routers`) and dashboard, the HTTPRoute status, and sending requests through Traefik.
-Even worse, the routes that *do* get applied are lost on the next reboot while they are being processed again. Traefik marks itself 'Ready' during this time, meaning scaling up/restart Traefik can lead to previously working routes failing.
+**Cleanup**: new to the v3 report, I also looked at cleaning up all of the resources to get back to a near-empty cluster.
+All implementations dropped to near-zero CPU. Most implementations dropped control plane memory down a bit (but not back to their starting levels), with the exception of Kgateway which actually had an increase (presumably handling the spike of the teardown).
+On the data plane, the 3 Envoy-based implementations (Kgateway, Istio, Envoy Gateway) all were completely unchanged - no memory was freed; the other three implementations dropped (though Traefik only trimmed off about 25% of its peak memory).
 
-> [!NOTE]
-> A future addition to the test suite will run the [route propagation time test](#route-propagation-time) against implementations at this scale.
-> Quick testing of other implementations reveals this may be a common area of issues for implementations; Nginx revealed up to 15s of delay time during the scale test while under lower scales was always sub-second.
+---
 
-Finally, Kong was run standalone due to previous issues with running alongside other implementations:
+To put things into perspective, I priced out what it would look like to run these in a real cloud environment:
 
-![](./imgs/route-scale-kong.png "Kong  performance")
-
-### Findings
-
-All data planes use a relatively large amount of RAM, ranging from 1GB to 1.8GB but remaining constant through the churn.
-The data plane CPU is also fairly similar, ranging from 200m to 450m.
-
-On the control plane side, however, we see a huge variance.
-Comparing the best performer in RAM and CPU to the others shows a wide spread:
-
-| Gateway       | Relative CPU Consumption | Relative Memory Usage |
-| ------------- | ------------------------ | --------------------- |
-| Istio         | 1.0x                     | 1.5x                  |
-| Kong          | 3.1x                     | 1.1x                  |
-| Nginx         | 5.2x                     | 3.0x                  |
-| Kgateway      | 6.6x                     | 6.2x                  |
-| Envoy Gateway | 14.6x                    | 8.7x (leaking)        |
-| Cilium        | 16.4x                    | 1.0x                  |
-
-As noted above, there were a few implementations with critical issues:
-* Envoy Gateway leaks memory; in just 15 minutes the memory usage grew to 45GB while other implementations remained constant.
-* Traefik cannot handle large number of routes at all and is unsafe to run at scale. In particular, any new instances may go many minutes before they start serving correct data!
-
-## Traffic Performance
-
-Aside from the control plane aspects, possibly the most critical aspect of a gateway is how it handles traffic.
-However, analyzing data plane performance is a notoriously tricky task.
-This can depend on thousands of variables that may vary between users environments.
-Additionally, often testing a highly synthetic setup will not reproduce to the real world.
-
-As such, I will not be doing a fine-grained analysis of each implementation.
-Instead, we will consider an implementation to be "sufficiently performant" if its performance is within the ballpark of others, and just analyze outliers.
-
-To reproduce this test, run `./tests/traffic.sh -d <duration> -q <qps> -c <connections> -p <payload size>`.
-A `qps` of `0` will attempt to send as much traffic as possible.
-This will run a load generator against each implementation in turn with the configured parameters.
-
-I ran the test through a variety of scenarios, some looking at maximum throughput and others latency.
-
-![](./imgs/traffic-throughput.png "Implementation throughput")
-![](./imgs/traffic-latency.png "Implementation latency")
-
-Additionally, we also analyze the CPU utilization with 1024 connections and a fixed 10k QPS:
-
-![](./imgs/traffic-cpu.png "Implementation CPU utilization")
+| Implementation | Data plane  | Control plane | Total (per year) | Relative |
+|----------------|-------------|---------------|------------------|----------|
+| Agentgateway   | $127        | $153          | $280             | 1x       |
+| Envoy Gateway  | $6,039      | $2,417        | $8,456           | 30x      |
+| Istio          | $5,181      | $319          | $5,500           | 20x      |
+| Kgateway       | $7,200      | $1,083        | $8,283           | 30x      |
+| Nginx          | $50,262     | $744          | $51,006          | 182x     |
+| Traefik        | $18,228     | -             | $18,228          | 65x      |
 
 <details>
-<summary>Raw Data</summary>
+<summary>How this was calculated</summary>
 
-```
-DEST           QPS     CONS  DUR  PAYLOAD  THROUGHPUT    P50       P90       P99
-istio          0       1     30   0        29079.91qps   0.034ms   0.039ms   0.054ms
-kgateway       0       1     30   0        36793.86qps   0.028ms   0.030ms   0.043ms
-envoy-gateway  0       1     30   0        34491.46qps   0.028ms   0.033ms   0.045ms
-cilium         0       1     30   0        20161.59qps   0.045ms   0.060ms   0.118ms
-nginx          0       1     30   0        1729.08qps    0.549ms   1.677ms   1.998ms
-traefik        0       1     30   0        29845.99qps   0.031ms   0.038ms   0.080ms
-kong           0       1     30   0        37481.98qps   0.024ms   0.032ms   0.063ms
-istio          15000   1     10   0        14998.28qps   0.034ms   0.044ms   0.098ms
-kgateway       15000   1     10   0        14998.28qps   0.028ms   0.036ms   0.089ms
-envoy-gateway  15000   1     10   0        14999.23qps   0.029ms   0.038ms   0.089ms
-cilium         15000   1     10   0        9308.51qps    0.088ms   0.171ms   0.291ms
-nginx          15000   1     10   0        4443.72qps    0.119ms   0.592ms   0.696ms
-traefik        15000   1     10   0        14998.27qps   0.033ms   0.044ms   0.096ms
-kong           15000   1     10   0        14998.19qps   0.026ms   0.038ms   0.077ms
-istio          0       16    10   0        130207.82qps  0.114ms   0.180ms   0.264ms
-kgateway       0       16    10   0        170469.20qps  0.085ms   0.144ms   0.227ms
-envoy-gateway  0       16    10   0        138551.00qps  0.107ms   0.174ms   0.257ms
-cilium         0       16    10   0        19258.45qps   0.756ms   1.628ms   2.283ms
-nginx          0       16    10   0        33641.28qps   0.188ms   1.579ms   3.216ms
-traefik        0       16    10   0        136693.31qps  0.105ms   0.167ms   0.343ms
-kong           0       16    10   0        130052.86qps  0.113ms   0.174ms   0.364ms
-istio          15000   16    10   0        14998.26qps   0.099ms   0.172ms   0.272ms
-kgateway       15000   16    10   0        14998.34qps   0.091ms   0.148ms   0.230ms
-envoy-gateway  15000   16    10   0        14998.01qps   0.094ms   0.156ms   0.248ms
-cilium         15000   16    10   0        14998.17qps   0.207ms   0.462ms   1.571ms
-nginx          15000   16    10   0        10797.45qps   0.154ms   2.599ms   6.694ms
-traefik        15000   16    10   0        14997.66qps   0.097ms   0.152ms   0.280ms
-kong           15000   16    10   0        14997.49qps   0.121ms   0.199ms   0.399ms
-istio          100000  16    10   0        99994.19qps   0.097ms   0.182ms   0.283ms
-kgateway       100000  16    10   0        99997.92qps   0.046ms   0.119ms   0.225ms
-envoy-gateway  100000  16    10   0        99997.30qps   0.071ms   0.155ms   0.243ms
-cilium         100000  16    10   0        20049.95qps   0.711ms   1.593ms   1.993ms
-nginx          100000  16    10   0        31803.72qps   0.186ms   1.642ms   3.428ms
-traefik        100000  16    10   0        99994.40qps   0.085ms   0.163ms   0.348ms
-kong           100000  16    10   0        99424.88qps   0.129ms   0.196ms   0.413ms
-istio          50000   16    10   4096     49997.86qps   0.066ms   0.111ms   0.230ms
-kgateway       50000   16    10   4096     49998.15qps   0.043ms   0.064ms   0.148ms
-envoy-gateway  50000   16    10   4096     49997.98qps   0.048ms   0.082ms   0.183ms
-cilium         50000   16    10   4096     18528.44qps   0.768ms   1.682ms   2.381ms
-nginx          50000   16    10   4096     27099.19qps   0.185ms   1.073ms   4.509ms
-traefik        50000   16    10   4096     49995.43qps   0.055ms   0.135ms   0.416ms
-kong           50000   16    10   4096     49997.96qps   0.034ms   0.141ms   0.491ms
-istio          0       512   10   0        328168.60qps  1.518ms   2.645ms   3.793ms
-kgateway       0       512   10   0        400687.22qps  1.215ms   2.254ms   3.575ms
-envoy-gateway  0       512   10   0        325149.12qps  1.487ms   2.787ms   4.219ms
-cilium         0       512   10   0        22098.60qps   23.147ms  32.489ms  46.874ms
-nginx          0       512   10   0        91579.69qps   4.481ms   9.789ms   24.955ms
-traefik        0       512   10   0        217669.76qps  0.323ms   6.831ms   17.076ms
-kong           0       512   10   0        104350.24qps  4.480ms   7.335ms   16.449ms
-```
+Calculation is a wild estimate based on AWS on-demand pricing:
+* $38.94 per GB of RAM per year ($0.004445/GB-hour)
+* $354.6 per vCPU per year ($0.04048/vCPU-hour)
+* 3 controller replicas
+* 30 data plane replicas
+* 1.5 bin packing factor
+* Peak (max) memory and average (mean) CPU from the large scale test above
+* Traefik has no separate control plane, so it is only counted as data plane replicas
 
 </details>
 
+### Traffic during changes
+
+The above tests simply configure the gateway without actual traffic.
+A common problem in gateways is how to handle traffic during a configuration change, and the impact that may have on memory.
+For example, some proxies reload configuration by cloning their state and keeping existing connections on the old process, while others allow incremental updates.
+
+In this test, we run the same route scale test, but run `tests/keepalive.sh` at the same time, which constantly sends 30s requests.
+
+![](./imgs/v3-route-scale-keepalive.png "Route scale test with long-lived requests")
+
+Nginx is the only proxy that is noticeably impacted by this test, showing dramatically increased memory from the traffic.
+
+> [!NOTE]
+> My guess is that this is based on Nginx persisting old copies of its worker's configuration to handle the existing traffic leading to copies of the same configuration.
+
 ### Findings
 
-For most tests, there was a general grouping of implementations seeing similar results.
-However, there were a few outliers.
+Through this test and subsequent investigation a number of findings beyond the raw numbers came up.
 
-**Nginx** stands out as having performance 5-20x worse than other implementations in every test, both in throughput and CPU utilization.
-Some analysis of this found this was due to not pooling upstream connections (or at least, not efficiently),
-meaning each HTTP request must create a new TCP connection.
-In contrast, every other implementation would re-use the same TCP connections throughout the test.
-Interestingly, Cilium also plays a role here; because Cilium requires being the cluster CNI in order to use it as a Gateway,
-my cluster setup naturally uses Cilium as the CNI.
-Cilium does additional work during TCP connection establishment, leading to a spike in Cilium CPU when Nginx receives traffic:
+#### Nginx deadlocks during configuration update
 
-![](./imgs/traffic-cilium-nginx.png "Cilium CPU spiking when Nginx receives traffic")
+During multiple tests I encountered a deadlock in Nginx.
+This caused all configuration updates to be permanently blocked until Nginx was restarted.
 
-However, this is *not* the cause of Nginx's poor performance; testing on clusters without Cilium reveal similar results.
+I suspect this is the same root cause as [an issue](./README-v2.md#route-propagation-v2) I reported in the previous report.
+This time I was able to debug it enough to open an issue: https://github.com/nginx/nginx-gateway-fabric/issues/6233.
 
-**Cilium** additionally sees poor performance.
-When handling only a single connection the results aren't too bad, achieving about 66% as much throughput as the typical implementation, Cilium is unable to scale up to serve multiple connections.
-While other Envoy-based implementations are able to achieve 4x throughput with 16 connections and 10x throughput with 512 connections, Cilium's throughput remains consistent at all connection counts.
-At 512 connections, this leads to a 20x performance gap between Cilium and Kgateway (despite both using the same Envoy data plane).
+> [!NOTE]
+> None of the test results above show Nginx deadlocking; when it does deadlock its CPU instantly drops to 0%.
+> I re-ran any tests that triggered the deadlock.
 
-**Kong** sees competitive performance results up until the number of connections exceeds the core count of the node.
-At this point, performance fails to continue to scale up.
-In contrast, the Envoy-based implementations continue to scale beyond 16 connections (the test was run on a 16 core machine). 
+#### Envoy memory usage
 
-**Traefik** shows similar performance to the Envoy-based implementations at smaller scales, but isn't able to scale up to high core counts as effectively.
-Like Kong, Traefik is unable to scale up beyond a certain connection count.
-However, this seems to occur at 32 connections (1 connection per *thread*) compared to Kong which gets limited at 16 connections (1 connection per *core*).
-This is likely due to Traefik using 32 processes (via `GOMAXPROCS` auto-detecting thread counts) while Nginx using 16 processes.
+An interesting divergence shows up on the data plane memory usage between Envoy Gateway and Istio/Kgateway, despite all three being Envoy-based - the latter both use ~2x the memory for the same configuration.
 
-The rest of the implementations (Istio, Envoy Gateway, and Kgateway) are generally fairly consistent.
-However, at very high loads Kgateway pulls ahead slightly, achieving 25% greater throughput at 512 connections compare to Envoy Gateway and Istio.
+> [!NOTE]
+> My guess is that this is due to how each project configures Envoy. The test has a Service with 2 ports, but Routes only use 1 port.
+> * Envoy Gateway only configures the proxy with actively referenced Service/Ports.
+> * Istio and Kgateway always send all Service/Ports even if they are not referenced by any Routes.
 
-![](./imgs/traffic-connections.png "Throughput vs connections")
+This same design difference does come with a tradeoff seen in the [route change](#route-changes) test though.
+
+#### High cardinality metrics
+
+One thing that surprised me a bit was that Istio's CPU usage was about 50% of Kgateway and Envoy Gateway, despite being the same proxy.
+
+After some investigation, I found one factor: metric cardinality. Both Kgateway and Envoy Gateway produced _far_ more time series metrics than any other implementation:
+
+| Implementation | Time Series |
+|----------------|-------------|
+| Agentgateway   | 58          |
+| Envoy Gateway  | 331,972     |
+| Istio          | 546         |
+| Kgateway       | 371,843     |
+| Nginx          | 41          |
+| Traefik        | 50          |
+
+This is not inherently a bad thing if the metrics are being used, but comes at a fairly high cost.
+
+#### Network usage
+
+Another thing I captured in this test is the network usage of each control plane during the test, which shows how much data is being sent from the control plane to the proxy.
+
+![](./imgs/v3-route-scale-network.png "Network usage during the test")
+
+As one would expect, [Traefik's architecture](#architecture) results in near-zero traffic as there is no split control/data plane (the minimal usage, I assume, is from metrics scraping).
+Surprisingly, Agentgateway's usage is similarly nearly as low.
+The others use a range of 2-5MB/s - at this rate, cloud cross-AZ fees start to become a problem, so consider zonal placement if you have high configuration churn.
+
+## ListenerSet Scale
+
+One of the newer resources in Gateway API, [ListenerSet](https://gateway-api.sigs.k8s.io/guides/user-guides/listener-set/) allows users to create an `Ingress`-like experience with per-namespace domain and TLS settings.
+
+This test is similar to the [Route Scale](#route-scale) test but with `ListenerSet`.
+
+We create 50 namespaces, each with 50 "tenants". Each tenant has a Service + Pod, a ListenerSet with a wildcard hostname (`*.<tenant>.<namespace>.example.com`),
+its own TLS certificate listing 16 hostnames, and 16 Routes (one per hostname).
+In total this is 2,500 ListenerSets per Gateway, 2,500 certificates, and 40,000 Routes.
+
+Traefik does not support `ListenerSet`, so it is excluded from the test (note: it does appear in the graphs below, but any usage is from processing configuration that does not apply to it).
+
+To run the test: `./tests/listenerset-load.sh 50 50`.
+
+![](./imgs/v3-listenerset-scale-50-50.png "ListenerSet scale test, 50 namespaces with 50 ListenerSets")
+
+Overall, the results are roughly in line with the route scale test, with some divergence.
+All of the controllers use more resources than in the route scale test, but the details vary.
+For example, while the route scale test largely showed implementations have a peak during the initial phase and then a lower usage throughout the steady phase,
+this was less apparent here: only Agentgateway had a noticeable decrease during the steady state phase. Nginx had a similar low-CPU footprint just without much of a spike at all.
+Istio, Envoy Gateway, and Kgateway used substantially more CPU than the route test, with Envoy Gateway consuming roughly double the RAM of the others this time around. 
+
+Like the route scale test, Nginx data plane continues to be the highest resource usage in CPU and memory.
+Envoy Gateway uses about 2.5x the memory of Kgateway and Istio (more on this below).
+
+Using the same [pricing estimate](#large-scale) as the route scale test:
+
+| Implementation | Data plane  | Control plane | Total (per year) | Relative |
+|----------------|-------------|---------------|------------------|----------|
+| Agentgateway   | $319        | $715          | $1,034           | 1x       |
+| Envoy Gateway  | $24,914     | $5,529        | $30,443          | 29x      |
+| Istio          | $9,060      | $2,216        | $11,276          | 11x      |
+| Kgateway       | $11,496     | $4,066        | $15,562          | 15x      |
+| Nginx          | $131,035    | $895          | $131,930         | 128x     |
+
+### Findings
+
+#### Envoy memory usage
+
+In the [route scale](#route-scale) test, we saw [Envoy Gateway](#envoy-memory-usage) use about half of the memory of Kgateway and Istio.
+Here, however, we see the inverse: Envoy Gateway using 5.6GB while Istio and Kgateway are both around 2GB.
+
+This seems to come back to the same design decisions that helped in the route scale test.
+This test has 2,500 Services but 40,000 Routes (compared to 5,000 routes and services in the route scale test).
+While Istio and Kgateway make an Envoy `cluster` per-Service, Envoy Gateway makes one per-Route.
+A `cluster` is an internal Envoy concept representing a possible destination, and uses a fairly substantial amount of memory.
+
+#### Nginx pod churn
+
+If you look closely, you can see Nginx restarts at the start and end of the test.
+This is due to the ListenerSet setup exposing a new port (443) for the first time.
+Anytime the set of ports exposed changes, Nginx restarts the data plane.
+No other implementation has this behavior.
+
+## Route Changes
+
+While the previous test investigates how each implementation scales with large configs, it's also important to see how they handle changes.
+Ideally, an implementation should quickly apply changes with zero downtime.
+
+### Route Propagation Delay
+
+In this test, we create new routes and then wait for them to be ready, accepting a request on the route with a 200.
+Additionally, we also check that the transition gracefully transitions from a `404` to a `200`.
+
+First, we run incrementally: we apply a route and wait for all implementations to return a 200, and record how long they took.
+Then we repeat 3,000 times. Traefik is skipped (`SKIP_SLOW`) for this test, as it was seen to have a floor of 2s which skews the results too much.
+
+`SKIP_SLOW=true ./tests/probe.sh joined --routes=3000`
+
+![](./imgs/v3-probe.png "Route propagation test")
+
+A variation of this applies routes as fast as possible while sending the same requests. This gives a different view of
+how each gateway processes routes.
+
+`./tests/probe.sh joined --routes=3000 --burst`
+
+![](./imgs/v3-probe-burst.png "Route propagation test, burst")
+
+#### Findings
+
+Overall, most implementations do reasonably here.
+If you are running a serverless platform like [Knative](https://knative.dev/), low-latency route updates may be important, but for the most part the difference between 20ms and 2s is not really noticeable.
+
+While all results fall in the range of acceptable, the burst test still provides some interesting insights.
+Aside from Agentgateway, all implementations have a saw-tooth pattern. This indicates batching of updates.
+For example, Istio specifically batches configuration changes for up to 10 seconds, leading to the 10s peaks we see.
+As a side effect of that, we also see it using substantially less network than others:
+
+![](./imgs/v3-probe-burst-network.png "Route propagation test, burst network")
+
+### Route Modification Stability
+
+In this test, we do not create new routes but instead modify existing routes and ensure the change is zero-downtime.
+This is an important test for production stability; while it's unlikely a _new_ route is going to get traffic within milliseconds,
+existing routes already serving production traffic should not experience downtime.
+
+`./tests/routechange.sh --iterations=20`
+
+This test is a simple pass/fail: implementations must serve all 200s during the route changes.
+2 of 6 implementations fail to safely update a route with zero downtime:
+
+| Gateway       | Result | Reason                       |
+|---------------|--------|------------------------------|
+| Agentgateway  | ✅     |                              |
+| Envoy Gateway | ❌     | 503s and 500s during changes |
+| Istio         | ✅     |                              |
+| Kgateway      | ✅     |                              |
+| Nginx         | ❌     | 500s during changes          |
+| Traefik       | ✅     |                              |
+
+### Deployment Changes
+
+Similar to [Route Modification Stability](#route-modification-stability), it's important for a gateway to maintain zero downtime during deployments.
+This applies to both the gateway itself, as well as backends.
+
+We can test this by sending traffic while doing a deployment rollout of the `backend` and `gateway`:
+
+`./tests/rollout.sh --target=[backend|gateway]`
+
+This test is a simple pass/fail: implementations must serve all 200s during a rollout of the backend and the gateway.
+
+| Gateway       | Backend Rollout | Gateway Rollout |
+|---------------|-----------------|-----------------|
+| Agentgateway  | ✅              | ✅              |
+| Envoy Gateway | ✅              | ✅              |
+| Istio         | ✅              | ✅              |
+| Kgateway      | ✅              | ✅              |
+| Nginx         | ✅              | ❌              |
+| Traefik       | ✅              | ❌              |
+
+While all implementations handle a backend rollout gracefully, Nginx and Traefik experience errors on Gateway rollouts.
+
+### Invalid Configuration
+
+This test checks how the gateways handle invalid configuration. The test works in three phases:
+
+1. Apply a valid config, ensure it works (everyone should pass this!).
+2. Apply an invalid config.
+3. Apply another valid config. This one should still apply.
+
+The test is pass/fail: an implementation passes if the valid configuration applies, and fails if it is ignored.
+
+This tests an important production capability: can one bad configuration take down the entire gateway?
+
+`./tests/badconfig.sh` runs the test. Results:
+
+| Gateway       | Invalid configuration doesn't block valid configuration |
+|---------------|---------------------------------------------------------|
+| Agentgateway  | ✅                                                      |
+| Envoy Gateway | ❌                                                      |
+| Istio         | ❌                                                      |
+| Kgateway      | ❌                                                      |
+| Nginx         | ✅                                                      |
+| Traefik       | ✅                                                      |
+
+Here the three Envoy-based implementations (Envoy Gateway, Istio, Kgateway) fail in the same manner: a single bad route blocks other routes from being updated.
+
+### Attached Routes test
+
+This test is a bit silly in terms of practical usage, but I like it since it showcases a bit of implementation differences, so I included it.
+
+The `Gateway` object has a status field `attachedRoutes` that gives a count of the number of routes associated with it.
+
+The attached route test creates a bunch of routes and polls the attached route count.
+
+![](./imgs/v3-attached-routes-1k.png "Attached routes test, 1000 routes")
+
+We can also look at the total number of writes:
+
+| Gateway       | Writes |
+|---------------|--------|
+| Agentgateway  | 2000   |
+| Envoy Gateway | 1789   |
+| Istio         | 1390   |
+| Kgateway      | 1964   |
+| Nginx         | 341    |
+| Traefik       | 1009   |
+
+This shows similar batching as the [route propagation delay](#route-propagation-delay) test; all implementations except
+Agentgateway batch up writes and have fewer writes than true updates in the cluster.
+Envoy Gateway is the only implementation that struggles to keep the status update at "line rate"; in practice this likely has little real world meaning though.
+
+## Traffic Test
+
+This benchmark is primarily designed to test the _reliability_ and _scale_ of gateways.
+Benchmarking runtime latency/throughput is a much harder problem (especially done correctly with minimal bias), and one that has been done by many others.
+
+However, taking a coarse grained look at traffic is still useful.
+
+**Take everything here with a grain of salt; this test is not optimized around giving reliable performance numbers.**
+
+That being said, I ran a rough throughput test pushing maximum requests through the gateways at various concurrent connection counts.
+
+![](./imgs/v3-gateway-throughput.png "Gateway throughput by connection count")
+
+The results show the same as seen in [`v1` report](./README-v1.md):
+* Traefik performs decently but fails to scale to higher connection counts as well as others.
+* Nginx fails to scale up at all and suffers poor performance overall; this is entirely due to a default of not using keepalives to backends.
+  This same default also caused the test to fail a number of times due to ephemeral port exhaustion. Nginx allows tuning this.
+* The rest of the implementations were all in the same ballpark of one another; this test is not suitable for identifying small percentage differences.
+
+## Wrap up
+
+If you got this far, thank you for reading and I hope you enjoyed! Feel free to leave feedback in a GitHub issue.

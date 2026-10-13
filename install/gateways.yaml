@@ -6,13 +6,6 @@ spec:
   controllerName: gateway.envoyproxy.io/gatewayclass-controller
 ---
 apiVersion: gateway.networking.k8s.io/v1
-kind: GatewayClass
-metadata:
-  name: haproxy
-spec:
-  controllerName: gate.haproxy.org/hug
----
-apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: istio
@@ -87,13 +80,31 @@ spec:
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: haproxy
-  namespace: haproxy
+  name: kgateway
+  namespace: kgateway
 spec:
   allowedListeners:
     namespaces:
       from: All
-  gatewayClassName: haproxy
+  gatewayClassName: kgateway
+  listeners:
+  - protocol: HTTP
+    port: 80
+    name: http
+    allowedRoutes:
+      namespaces:
+        from: All
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: traefik
+  namespace: traefik
+spec:
+  allowedListeners:
+    namespaces:
+      from: All
+  gatewayClassName: traefik
   listeners:
   - protocol: HTTP
     port: 80

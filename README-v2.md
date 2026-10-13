@@ -1,6 +1,6 @@
 # Gateway API Benchmarks - Part 2
 
-This post represents "Part 2" of the original benchmarks done previously ([found here](./README.md)).
+This post represents "Part 2" of the original benchmarks done previously ([found here](./README-v1.md)).
 The testing done here is in additional to Part 1: it is highly recommended to read Part 1 first!
 
 The goal of this post is to followup on the originally tested implementations to see how they have changed,
@@ -44,7 +44,7 @@ This section is entirely my subjective analysis of the results, so I would encou
 
 Since the last report a short 3 months ago, many implementations have made some big changes!
 
-**Nginx** releases a v2.0 re-architecture that appears to address some of the [architectural findings](./README.md#architecture-comparison), and have reached out to let me know some of the other issues in the original report have been fixed.
+**Nginx** releases a v2.0 re-architecture that appears to address some of the [architectural findings](./README-v1.md#architecture-comparison), and have reached out to let me know some of the other issues in the original report have been fixed.
 
 **Envoy Gateway** community [formally responded to the report](https://github.com/envoyproxy/gateway/discussions/6285#discussioncomment-13575356), denying many of the reported findings. There are a few claims to break down here:
 * For the route change test, where Envoy Gateway saw downtime, they claim the issue is a ["fundamental issue around Envoy delta update"](https://github.com/envoyproxy/gateway/discussions/6285#discussioncomment-13579398). However, 4 Envoy-based implementations were tested; Envoy Gateway was the only implementation that had this, indicating that it is not a fundamental issue with Envoy, but rather a limitation found only in Envoy Gateway.
@@ -52,7 +52,7 @@ Since the last report a short 3 months ago, many implementations have made some 
 * The report showed a memory leak in the control plane, where memory quickly grew to 48 Gb. The claim is that the reported metric, `container_memory_working_set_bytes`, is not an appropriate measure of memory. This is not true; this metric is exactly what Kubernetes itself uses for memory limits, OOMKilling, etc, and is widely considered to be the source of truth for memory usage in Kubernetes ([1](https://faun.pub/how-much-is-too-much-the-linux-oomkiller-and-used-memory-d32186f29c9d), [2](https://docs.newrelic.com/whats-new/2021/03/kubernetes-whats-new/), [3](https://github.com/google/cadvisor/issues/2582)). Additionally, a reproduction shows the Go Heap *in use* memory, which cannot be reclaimed by the OS or GC, grows in correlation to the `container_memory_working_set_bytes` during the leak.
   * ![](./imgs/envoy-gateway-memory.png "Envoy Gateway memory usage during leak")
 
-  * Further, they claim that memory is intentionally used, as a tradeoff, to reduce CPU. However, the Envoy Gateway control plane actually used 14.6x the CPU and 5.8x the memory of the top performing Envoy-based implementation, and 4.7x the CPU and 7.9x the memory of the second-best performing one ([source](./README.md#findings-2)), indicating the tradeoff may be ineffective.
+  * Further, they claim that memory is intentionally used, as a tradeoff, to reduce CPU. However, the Envoy Gateway control plane actually used 14.6x the CPU and 5.8x the memory of the top performing Envoy-based implementation, and 4.7x the CPU and 7.9x the memory of the second-best performing one ([source](./README-v1.md#findings-2)), indicating the tradeoff may be ineffective.
   
 
 **Cilium** community [created an issue to track follow-ups to the report](https://github.com/cilium/cilium/issues/39974) which has unfortunately been closed without any activity.
@@ -90,13 +90,13 @@ However, this didn't work.
 * Once I manually added the permissions, I had to also manually update the Service to expose it.
 * Even once fully setup, there is no Gateway address in the status, making most of the tests not work. Since I was curious, I changed some tests to manually hardcode the address which is why I was able to do a few tests.
 
-HAProxy follows the [same problematic architecture as some others tested in the original report](./README.md#architecture-comparison): there is a single Deployment that contains the control plane and all instances of Gateways co-located in one pod. This violates the security and deployment model of Gateway API.
+HAProxy follows the [same problematic architecture as some others tested in the original report](./README-v1.md#architecture-comparison): there is a single Deployment that contains the control plane and all instances of Gateways co-located in one pod. This violates the security and deployment model of Gateway API.
 
-In the [Route Propagation test](./README.md#route-propagation-time), HAProxy takes 5s to propagate a route, compared to 5-100ms for leading implementations.
+In the [Route Propagation test](./README-v1.md#route-propagation-time), HAProxy takes 5s to propagate a route, compared to 5-100ms for leading implementations.
 
-For the [traffic performance testing](./README.md#traffic-performance), HAProxy and Agentgateway were roughly comparable, usually within +/-10% of each other on each various test. However, I encountered issues with the HTTPRoute -- despite it being a valid route, with a valid status reported, the route got a 404. Only after adding some additional matchers to the route did it work at all.
+For the [traffic performance testing](./README-v1.md#traffic-performance), HAProxy and Agentgateway were roughly comparable, usually within +/-10% of each other on each various test. However, I encountered issues with the HTTPRoute -- despite it being a valid route, with a valid status reported, the route got a 404. Only after adding some additional matchers to the route did it work at all.
 
-In the [Route Scale test](./README.md#route-scale), HAProxy seemed to do pretty well, but its hard to judge due to two of the issues previously mentioned: they have a joint control plane and data plane (so we cannot isolate which of these is performing), and they throttle updates to every 5s which means we are trading off availability for resource consumption, which is not something the test measures.
+In the [Route Scale test](./README-v1.md#route-scale), HAProxy seemed to do pretty well, but its hard to judge due to two of the issues previously mentioned: they have a joint control plane and data plane (so we cannot isolate which of these is performing), and they throttle updates to every 5s which means we are trading off availability for resource consumption, which is not something the test measures.
 
 Overall, its great to see another project moving to the Gateway API, but for now I think HAProxy is still a work in progress. I look forward to watching its progress.
 
@@ -145,7 +145,7 @@ spec:
         from: All
 ```
 
-First up, the [attached routes](./README.md#attached-routes) test fails to complete
+First up, the [attached routes](./README-v1.md#attached-routes) test fails to complete
 
 ```shell
 $ ./tests/attached-routes.sh joined
@@ -162,7 +162,7 @@ NAME     ATTACHED
 apisix   0
 ```
 
-Next up, the [route propagation time](./README.md#route-propagation-time) test also fails:
+Next up, the [route propagation time](./README-v1.md#route-propagation-time) test also fails:
 
 ```bash
 $ ./tests/probe.sh joined
@@ -177,7 +177,7 @@ NAME     CLASS    ADDRESS   PROGRAMMED   AGE
 apisix   apisix             True         43m
 ```
 
-The [route change](./README.md#route-changes) test fails for the same reason.
+The [route change](./README-v1.md#route-changes) test fails for the same reason.
 
 We will continue to check in with APISIX in future iterations!
 
@@ -203,7 +203,7 @@ Since we have some new implementations, and some major changes to others, it see
 
 ### Attached Routes
 
-This test was somewhat less interesting than [last time](./README.md#attached-routes): all implementations tested had very similar patterns in terms of how they update the status.
+This test was somewhat less interesting than [last time](./README-v1.md#attached-routes): all implementations tested had very similar patterns in terms of how they update the status.
 
 ![](./imgs/attached-routes-v2.png "Attached Routes test result")
 
@@ -240,7 +240,7 @@ Two issues remain that were detected in the original report:
 
 ### Route propagation time
 
-This test re-runs the [route propagation time](./README.md#route-propagation-time) test, creating new routes and waiting for them to become ready.
+This test re-runs the [route propagation time](./README-v1.md#route-propagation-time) test, creating new routes and waiting for them to become ready.
 
 ![](./imgs/probe-test-v2.png "Route propagation test")
 
@@ -274,7 +274,7 @@ Overall, Agentgateway shows no penalty under load, Istio shows a slight penalty,
 
 ### Route Changes
 
-This test re-runs the [route changes](./README.md#route-changes) test, sending traffic while a route is modified. Downtime caused by a gateway implementation during a rollout will directly impact users, as these routes may be serving live traffic already.
+This test re-runs the [route changes](./README-v1.md#route-changes) test, sending traffic while a route is modified. Downtime caused by a gateway implementation during a rollout will directly impact users, as these routes may be serving live traffic already.
 
 | Gateway       | Result | Reason                       |
 | ------------- | ------ | ---------------------------- |
@@ -292,7 +292,7 @@ The 3 incumbents behaved the same as in the previous testing, while Agentgateway
 
 ### Route Scale
 
-This test re-runs the [route scale](./README.md#route-scale) test, creating 5,000 routes total and measuring resource consumption.
+This test re-runs the [route scale](./README-v1.md#route-scale) test, creating 5,000 routes total and measuring resource consumption.
 
 ![](./imgs/route-scale-v2.png "Route scale test overview")
 
@@ -328,7 +328,7 @@ Put another way, relative to Agentgateway, Istio uses 44x more resources, Envoy 
 
 ### Traffic Performance
 
-This test runs the [traffic performance](./README.md#traffic-performance) test from the original test. Its worth repeating that performance benchmarking of traffic is very hard, and not something this test suite focuses on. The goal of this test is only to identify major outliers in performance; more focused data plane testing will require more efforts.
+This test runs the [traffic performance](./README-v1.md#traffic-performance) test from the original test. Its worth repeating that performance benchmarking of traffic is very hard, and not something this test suite focuses on. The goal of this test is only to identify major outliers in performance; more focused data plane testing will require more efforts.
 
 First up we measure maximum throughput as number of connections increases:
 
